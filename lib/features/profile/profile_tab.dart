@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../screens/admin/admin_dashboard_screen.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
@@ -42,9 +43,9 @@ class ProfileTab extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
-                      _stat('12', 'Κρατήσεις'),
+                      ProfileStat('12', 'Κρατήσεις'),
                       SizedBox(width: 30),
-                      _stat('5', 'Αξιολογήσεις'),
+                      ProfileStat('5', 'Αξιολογήσεις'),
                     ],
                   ),
                 ],
@@ -59,6 +60,16 @@ class ProfileTab extends StatelessWidget {
             _menuTile(icon: Icons.favorite_border, text: 'Αγαπημένα', onTap: () {}),
             const SizedBox(height: 10),
             _menuTile(icon: Icons.payments_outlined, text: 'Πληρωμές', onTap: () {}),
+            const SizedBox(height: 10),
+            _menuTile(
+              icon: Icons.admin_panel_settings_outlined,
+              text: 'Admin Dashboard',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AdminDashboardScreen(),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -97,10 +108,10 @@ class ProfileTab extends StatelessWidget {
   }
 }
 
-class _stat extends StatelessWidget {
+class ProfileStat extends StatelessWidget {
   final String number;
   final String label;
-  const _stat(this.number, this.label);
+  const ProfileStat(this.number, this.label, {super.key});
 
   @override
   Widget build(BuildContext context) {

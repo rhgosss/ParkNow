@@ -1,0 +1,9 @@
+Analyzing ParkNow...                                            
+
+   info - Parameter 'child' could be a super parameter - lib\core\state\app_state_scope.dart:5:9 - use_super_parameters
+   info - Constructors for public widgets should have a named 'key' parameter - lib\features\booking\booking_confirm_screen.dart:84:9 - use_key_in_widget_constructors
+   info - Constructors for public widgets should have a named 'key' parameter - lib\features\profile\profile_tab.dart:103:9 - use_key_in_widget_constructors
+warning - Unused import: 'package:flutter/material.dart' - test\widget_test.dart:8:8 - unused_import
+  error - Target of URI doesn't exist: 'package:uni_app/main.dart' - uni_app\test\widget_test.dart:11:8 - uri_does_not_exist
+  error - The name 'MyApp' isn't a class - uni_app\test\widget_test.dart:16:35 - creation_with_non_type
+

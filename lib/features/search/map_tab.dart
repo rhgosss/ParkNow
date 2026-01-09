@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/chip_pill.dart';
 
 class MapTab extends StatelessWidget {
   const MapTab({super.key});
@@ -130,11 +131,11 @@ class MapTab extends StatelessWidget {
                               const Expanded(
                                 child: Text('Κολωνάκι Parking', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                               ),
-                              Container(
+                          Container(
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(.12),
+                                  color: AppColors.primary.withValues(alpha: .12),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: const Icon(Icons.near_me_outlined, color: AppColors.primary),

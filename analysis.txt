@@ -1,0 +1,35 @@
+Analyzing ParkNow...                                            
+
+warning - Unused import: 'package:flutter/material.dart' - lib\app\router.dart:1:8 - unused_import
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:53:44 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:54:47 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:55:43 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:56:45 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:57:40 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:58:37 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:59:37 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:60:40 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:61:45 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:62:47 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:63:43 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:70:53 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:71:50 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:72:51 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:75:46 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:76:46 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\app\router.dart:77:43 - unnecessary_underscores
+   info - Parameter 'child' could be a super parameter - lib\core\state\app_state_scope.dart:5:9 - use_super_parameters
+   info - The type name '_row' isn't an UpperCamelCase identifier - lib\features\booking\booking_confirm_screen.dart:80:7 - camel_case_types
+   info - The type name '_stat' isn't an UpperCamelCase identifier - lib\features\profile\profile_tab.dart:100:7 - camel_case_types
+  error - The method 'ChipPill' isn't defined for the type 'MapTab' - lib\features\search\map_tab.dart:56:19 - undefined_method
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\search\map_tab.dart:137:60 - deprecated_member_use
+  error - The method 'ChipPill' isn't defined for the type 'MapTab' - lib\features\search\map_tab.dart:164:31 - undefined_method
+  error - The values in a const list literal must be constants - lib\features\search\map_tab.dart:164:31 - non_constant_list_element
+  error - The method 'ChipPill' isn't defined for the type 'MapTab' - lib\features\search\map_tab.dart:165:31 - undefined_method
+  error - The values in a const list literal must be constants - lib\features\search\map_tab.dart:165:31 - non_constant_list_element
+  error - The method 'ChipPill' isn't defined for the type 'MapTab' - lib\features\search\map_tab.dart:166:31 - undefined_method
+  error - The values in a const list literal must be constants - lib\features\search\map_tab.dart:166:31 - non_constant_list_element
+  error - The name 'MyApp' isn't a class - test\widget_test.dart:16:35 - creation_with_non_type
+  error - Target of URI doesn't exist: 'package:uni_app/main.dart' - uni_app\test\widget_test.dart:11:8 - uri_does_not_exist
+  error - The name 'MyApp' isn't a class - uni_app\test\widget_test.dart:16:35 - creation_with_non_type
+

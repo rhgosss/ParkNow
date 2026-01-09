@@ -5,8 +5,8 @@ class AppStateScope extends InheritedNotifier<AppState> {
   const AppStateScope({
     super.key,
     required AppState notifier,
-    required Widget child,
-  }) : super(notifier: notifier, child: child);
+    required super.child,
+  }) : super(notifier: notifier);
 
   static AppState of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppStateScope>();

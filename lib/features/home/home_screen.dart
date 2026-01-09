@@ -18,9 +18,18 @@ class HomeScreen extends StatelessWidget {
           children: [
             Text('Σύνδεσε εδώ τα Figma widgets.', style: t.bodyLarge),
             const SizedBox(height: 16),
+
             ElevatedButton(
               onPressed: () => context.go('/home/details?id=222-3153'),
               child: const Text('Go to Details'),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ✅ ΝΕΟ ΚΟΥΜΠΙ: Ανοίγει το "DB View" για να δεις οπτικά τους users
+            ElevatedButton(
+              onPressed: () => context.push('/debug/users'),
+              child: const Text('DEBUG: Δες Users DB'),
             ),
           ],
         ),

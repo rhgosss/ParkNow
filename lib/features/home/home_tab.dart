@@ -12,20 +12,26 @@ class HomeTab extends StatelessWidget {
 
     const spots = [
       ParkingSpot(
+        id: '1',
         title: 'Στεγασμένη Θέση Κέντρο',
         area: 'Αθήνα, Κολωνάκι',
         rating: 4.9,
         reviews: 127,
         pricePerHour: 8,
         imageUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=1200',
+        latitude: 37.9792,
+        longitude: 23.7411,
       ),
       ParkingSpot(
+        id: '2',
         title: 'Υπόγειο Parking',
         area: 'Αθήνα, Σύνταγμα',
         rating: 4.8,
         reviews: 90,
         pricePerHour: 7,
         imageUrl: 'https://images.unsplash.com/photo-1501179691627-eeaa65ea017c?w=1200',
+        latitude: 37.9755,
+        longitude: 23.7348,
       ),
     ];
 

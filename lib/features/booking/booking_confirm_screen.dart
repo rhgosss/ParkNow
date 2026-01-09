@@ -45,11 +45,11 @@ class BookingConfirmScreen extends StatelessWidget {
                 children: const [
                   Text('Σύνοψη', style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 10),
-                  _row('8€ × 4 ώρες', '32€'),
+                  BookingRow('8€ × 4 ώρες', '32€'),
                   SizedBox(height: 8),
-                  _row('Χρέωση υπηρεσίας', '3€'),
+                  BookingRow('Χρέωση υπηρεσίας', '3€'),
                   Divider(),
-                  _row('Σύνολο', '35€', highlight: true),
+                  BookingRow('Σύνολο', '35€', highlight: true),
                 ],
               ),
             ),
@@ -77,11 +77,11 @@ class BookingConfirmScreen extends StatelessWidget {
   }
 }
 
-class _row extends StatelessWidget {
+class BookingRow extends StatelessWidget {
   final String left;
   final String right;
   final bool highlight;
-  const _row(this.left, this.right, {this.highlight = false});
+  const BookingRow(this.left, this.right, {super.key, this.highlight = false});
 
   @override
   Widget build(BuildContext context) {

@@ -14,6 +14,10 @@ class ResultsListScreen extends StatelessWidget {
         title: const Text('Διαθέσιμα Parking'),
         actions: [
           IconButton(
+            onPressed: () => context.push('/search/map'),
+            icon: const Icon(Icons.map_outlined),
+          ),
+          IconButton(
             onPressed: () => context.push('/filters'),
             icon: const Icon(Icons.tune),
           ),
@@ -89,7 +93,7 @@ class ResultsListScreen extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(rating),
                       const Spacer(),
-                      Text(price, style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w800)),
+                      Text(price, style: const TextStyle(fontWeight: FontWeight.w800)),
                     ],
                   ),
                 ],

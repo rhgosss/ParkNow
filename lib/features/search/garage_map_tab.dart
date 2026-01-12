@@ -1,6 +1,9 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/data/parking_service.dart';
+import '../../../core/state/app_state_scope.dart';
 
 class GarageMapTab extends StatefulWidget {
   const GarageMapTab({super.key});
@@ -10,14 +13,10 @@ class GarageMapTab extends StatefulWidget {
 }
 
 class _GarageMapTabState extends State<GarageMapTab> {
-  final ClusterManager _clusterManager = ClusterManager(
-    clusterManagerId: const ClusterManagerId('garages'),
-  );
-
-  GoogleMapController? _mapController;
   GarageSpot? _selected;
+  DateTime _filterDate = DateTime.now(); // Default now
 
-  late final List<GarageSpot> _spots = _dummySpots();
+  late final List<GarageSpot> _spots = ParkingService().allSpots;
 
   static const LatLng _athensCenter = LatLng(37.9838, 23.7275);
 
@@ -31,38 +30,118 @@ class _GarageMapTabState extends State<GarageMapTab> {
           GoogleMap(
             initialCameraPosition: const CameraPosition(
               target: _athensCenter,
-              zoom: 12,
+              zoom: 14,
             ),
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
-            clusterManagers: {_clusterManager},
             markers: markers,
-            onMapCreated: (c) => _mapController = c,
+            onMapCreated: (c) {},
             onTap: (_) => setState(() => _selected = null),
           ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: _TopSearchPill(
-                      hint: 'Πού θέλεις να παρκάρεις;',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Search overlay: σύντομα')),
-                        );
-                      },
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TopSearchPill(
+                          hint: 'Πού θέλεις να παρκάρεις;',
+                          onTap: () => context.push('/search'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _RoundIconButton(
+                        icon: Icons.tune,
+                        onTap: () => context.push('/filters'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Διαθεσιμότητα:',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () =>
+                              setState(() => _filterDate = DateTime.now()),
+                          child: Text(
+                            'Τώρα',
+                            style: TextStyle(
+                              color: _isNow(_filterDate)
+                                  ? const Color(0xFF2563EB)
+                                  : Colors.black54,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('|', style: TextStyle(color: Colors.grey)),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () => setState(() => _filterDate =
+                              DateTime.now().add(const Duration(hours: 12))),
+                          child: Text(
+                            'Αργότερα',
+                            style: TextStyle(
+                              color: !_isNow(_filterDate)
+                                  ? const Color(0xFF2563EB)
+                                  : Colors.black54,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  _RoundIconButton(
-                    icon: Icons.tune,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Φίλτρα: σύντομα')),
-                      );
-                    },
+                  const SizedBox(height: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text('Διαθέσιμο',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 16),
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text('Κατειλημμένο',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -78,15 +157,25 @@ class _GarageMapTabState extends State<GarageMapTab> {
                   child: _SpotCard(
                     spot: _selected!,
                     onClose: () => setState(() => _selected = null),
-                    onBook: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Κράτηση: σύντομα')),
-                      );
+                    onBook: () => context.push('/spot/${_selected!.id}'),
+                    onToggleFavorite: () {
+                      AppStateScope.of(context).toggleFavorite(_selected!.id);
+                      setState(() {});
                     },
-                    onNavigate: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Οδηγίες: σύντομα')),
+                    isFavorite: AppStateScope.of(context).isFavorite(_selected!.id),
+                    onNavigate: () async {
+                      final uri = Uri.parse(
+                        'https://www.google.com/maps/search/?api=1&query=${_selected!.pos.latitude},${_selected!.pos.longitude}',
                       );
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Δεν βρέθηκε εφαρμογή χαρτών.')),
+                          );
+                        }
+                      }
                     },
                   ),
                 ),
@@ -97,68 +186,23 @@ class _GarageMapTabState extends State<GarageMapTab> {
     );
   }
 
+  bool _isNow(DateTime d) {
+    final now = DateTime.now();
+    return d.year == now.year &&
+        d.month == now.month &&
+        d.day == now.day &&
+        (d.hour - now.hour).abs() < 1;
+  }
+
+  // ΟΛΑ ΠΡΑΣΙΝΑ PINS
   Marker _toMarker(GarageSpot s) {
     return Marker(
       markerId: MarkerId(s.id),
       position: s.pos,
-      clusterManagerId: _clusterManager.clusterManagerId,
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
       onTap: () => setState(() => _selected = s),
-      infoWindow: InfoWindow(
-        title: s.title,
-        snippet: '${s.pricePerHour.toStringAsFixed(0)}€/ώρα',
-      ),
     );
   }
-
-  List<GarageSpot> _dummySpots() {
-    final rnd = Random(7);
-    final areas = [
-      'Κολωνάκι',
-      'Σύνταγμα',
-      'Πλάκα',
-      'Παγκράτι',
-      'Κυψέλη',
-      'Αμπελόκηποι',
-      'Νέος Κόσμος',
-      'Γκάζι',
-      'Μοναστηράκι',
-      'Εξάρχεια',
-    ];
-
-    final out = <GarageSpot>[];
-    for (var i = 0; i < 180; i++) {
-      final lat = _athensCenter.latitude + (rnd.nextDouble() - 0.5) * 0.18;
-      final lng = _athensCenter.longitude + (rnd.nextDouble() - 0.5) * 0.22;
-      final area = areas[rnd.nextInt(areas.length)];
-      final price = 5 + rnd.nextInt(6);
-      out.add(
-        GarageSpot(
-          id: 'g$i',
-          title: '$area Parking',
-          subtitle: 'Αθήνα',
-          pricePerHour: price.toDouble(),
-          pos: LatLng(lat, lng),
-        ),
-      );
-    }
-    return out;
-  }
-}
-
-class GarageSpot {
-  final String id;
-  final String title;
-  final String subtitle;
-  final double pricePerHour;
-  final LatLng pos;
-
-  GarageSpot({
-    required this.id,
-    required this.title,
-    required this.subtitle,
-    required this.pricePerHour,
-    required this.pos,
-  });
 }
 
 class _TopSearchPill extends StatelessWidget {
@@ -228,12 +272,16 @@ class _SpotCard extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onBook;
   final VoidCallback onNavigate;
+  final VoidCallback onToggleFavorite;
+  final bool isFavorite;
 
   const _SpotCard({
     required this.spot,
     required this.onClose,
     required this.onBook,
     required this.onNavigate,
+    required this.onToggleFavorite,
+    required this.isFavorite,
   });
 
   @override
@@ -252,7 +300,15 @@ class _SpotCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     spot.title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onToggleFavorite,
+                  icon: Icon(
+                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: isFavorite ? Colors.red : Colors.grey,
                   ),
                 ),
                 IconButton(
@@ -266,7 +322,8 @@ class _SpotCard extends StatelessWidget {
                 const Icon(Icons.place_outlined, size: 18),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(spot.subtitle, style: const TextStyle(color: Colors.black54)),
+                  child: Text(spot.subtitle,
+                      style: const TextStyle(color: Colors.black54)),
                 ),
                 Text(
                   '${spot.pricePerHour.toStringAsFixed(0)}€/ώρα',

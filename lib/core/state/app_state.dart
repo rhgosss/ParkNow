@@ -1,45 +1,69 @@
+// lib/core/state/app_state.dart
 import 'package:flutter/foundation.dart';
+import '../data/auth_repository.dart';
 
-enum UserRole { parker, host }
+export '../data/auth_repository.dart' show UserRole;
 
 class AppState extends ChangeNotifier {
-  bool _loggedIn = false;
-  bool _needsRoleSelection = false; // μόνο μετά από register
-  UserRole? _role;
+  final AuthRepository _auth = AuthRepository();
 
-  bool get loggedIn => _loggedIn;
-  bool get needsRoleSelection => _needsRoleSelection;
-  UserRole get role => _role ?? UserRole.parker; // default για login demo
-
-  void login({required String email, required String password}) {
-    _loggedIn = true;
-    _needsRoleSelection = false; // δεν ξαναρωτάμε role στο login
-    _role ??= UserRole.parker;   // default
-    notifyListeners();
+  AppState() {
+    _auth.addListener(notifyListeners);
   }
 
-  void startRegister() {
-    _loggedIn = true;
-    _needsRoleSelection = true;  // ΜΟΝΟ στην εγγραφή
-    _role = null;
-    notifyListeners();
+  @override
+  void dispose() {
+    _auth.removeListener(notifyListeners);
+    super.dispose();
   }
 
-  void setRole(UserRole role) {
-    _role = role;
-    _needsRoleSelection = false;
-    notifyListeners();
+  bool get loggedIn => _auth.isLoggedIn;
+  UserRole get role => _auth.currentUser?.role ?? UserRole.driver;
+  AppUser? get currentUser => _auth.currentUser;
+  
+  bool get needsRoleSelection => false;
+
+  Future<void> login(String email, String password) async {
+    await _auth.login(email, password);
   }
 
-  void switchRole() {
-    _role = (role == UserRole.parker) ? UserRole.host : UserRole.parker;
-    notifyListeners();
+  Future<void> register({
+    required String email,
+    required String password,
+    required UserRole role,
+    required String name,
+    required String phone,
+  }) async {
+    await _auth.register(
+      email: email,
+      password: password,
+      role: role,
+      name: name,
+      phone: phone,
+    );
   }
 
-  void logout() {
-    _loggedIn = false;
-    _needsRoleSelection = false;
-    _role = null;
-    notifyListeners();
+  Future<void> logout() async {
+    await _auth.logout();
+  }
+
+  Future<void> switchRole() async {
+    await _auth.switchRole();
+  }
+
+  // Favorites
+  Future<void> toggleFavorite(String spotId) async {
+    await _auth.toggleFavorite(spotId);
+  }
+
+  bool isFavorite(String spotId) {
+    return _auth.isFavorite(spotId);
+  }
+
+  List<String> get favoriteSpotIds => _auth.favoriteSpotIds;
+
+  // Profile updates
+  Future<void> updateUserName(String newName) async {
+    await _auth.updateUserName(newName);
   }
 }

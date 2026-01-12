@@ -134,7 +134,7 @@ class MapTab extends StatelessWidget {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(.12),
+                                  color: AppColors.primary.withValues(alpha: .12),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: const Icon(Icons.near_me_outlined, color: AppColors.primary),

@@ -15,6 +15,7 @@ class SearchOverlayScreen extends StatelessWidget {
           child: Column(
             children: [
               TextField(
+                autofocus: true,
                 decoration: InputDecoration(
                   hintText: 'Περιοχή / Διεύθυνση...',
                   filled: true,
@@ -22,6 +23,10 @@ class SearchOverlayScreen extends StatelessWidget {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   prefixIcon: const Icon(Icons.search),
                 ),
+                onSubmitted: (query) {
+                  // Pass query to results screen
+                  context.push('/results?q=$query'); 
+                },
               ),
               const SizedBox(height: 12),
               Row(
@@ -36,9 +41,9 @@ class SearchOverlayScreen extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => context.go('/results'),
+                      onPressed: () => context.push('/results'), // Show all if clicked
                       icon: const Icon(Icons.list),
-                      label: const Text('Αποτελέσματα'),
+                      label: const Text('Όλα τα αποτελέσματα'),
                     ),
                   ),
                 ],

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/state/app_state_scope.dart';
+import '../../core/data/parking_service.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
@@ -7,13 +10,33 @@ class ProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final currentUser = AppStateScope.of(context).currentUser;
+    
+    if (currentUser == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Προφίλ')),
+        body: const Center(child: Text('Πρέπει να συνδεθείτε')),
+      );
+    }
+
+    final bookingCount = ParkingService().getBookingsForUser(currentUser.id).length;
+    final initials = currentUser.name.split(' ').map((n) => n[0]).take(2).join().toUpperCase();
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(onPressed: () {}, icon: const Icon(Icons.arrow_back)),
+        leading: IconButton(
+          onPressed: () => context.go('/main'), 
+          icon: const Icon(Icons.arrow_back),
+        ),
         title: const Text('Προφίλ'),
         actions: [
-          TextButton(onPressed: () {}, child: const Text('Έξοδος')),
+          TextButton(
+            onPressed: () {
+              AppStateScope.of(context).logout();
+              context.go('/login');
+            }, 
+            child: const Text('Έξοδος'),
+          ),
         ],
       ),
       body: SafeArea(
@@ -29,22 +52,22 @@ class ProfileTab extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 34,
                     backgroundColor: AppColors.primary,
-                    child: Text('ΓΠ', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 18)),
                   ),
                   const SizedBox(height: 10),
-                  Text('Γιώργος Παπαδόπουλος', style: t.titleMedium),
+                  Text(currentUser.name, style: t.titleMedium),
                   const SizedBox(height: 4),
-                  Text('george.p@email.com', style: t.bodySmall),
+                  Text(currentUser.email, style: t.bodySmall),
                   const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      _stat('12', 'Κρατήσεις'),
-                      SizedBox(width: 30),
-                      _stat('5', 'Αξιολογήσεις'),
+                    children: [
+                      _StatItem(bookingCount.toString(), 'Κρατήσεις'),
+                      const SizedBox(width: 30),
+                      const _StatItem('5', 'Αξιολογήσεις'),
                     ],
                   ),
                 ],
@@ -52,13 +75,29 @@ class ProfileTab extends StatelessWidget {
             ),
             const SizedBox(height: 14),
 
-            _menuTile(icon: Icons.person_outline, text: 'Επεξεργασία Προφίλ', onTap: () {}),
+            _menuTile(
+              icon: Icons.person_outline, 
+              text: 'Επεξεργασία Προφίλ', 
+              onTap: () => context.push('/edit-profile'),
+            ),
             const SizedBox(height: 10),
-            _menuTile(icon: Icons.calendar_month_outlined, text: 'Οι Κρατήσεις μου', onTap: () {}),
+            _menuTile(
+              icon: Icons.calendar_month_outlined, 
+              text: 'Οι Κρατήσεις μου', 
+              onTap: () => context.push('/my-bookings'),
+            ),
             const SizedBox(height: 10),
-            _menuTile(icon: Icons.favorite_border, text: 'Αγαπημένα', onTap: () {}),
+            _menuTile(
+              icon: Icons.favorite_border, 
+              text: 'Αγαπημένα', 
+              onTap: () => context.push('/favorites'),
+            ),
             const SizedBox(height: 10),
-            _menuTile(icon: Icons.payments_outlined, text: 'Πληρωμές', onTap: () {}),
+            _menuTile(
+              icon: Icons.payments_outlined, 
+              text: 'Πληρωμές', 
+              onTap: () => context.push('/payments'),
+            ),
           ],
         ),
       ),
@@ -97,10 +136,10 @@ class ProfileTab extends StatelessWidget {
   }
 }
 
-class _stat extends StatelessWidget {
+class _StatItem extends StatelessWidget {
   final String number;
   final String label;
-  const _stat(this.number, this.label);
+  const _StatItem(this.number, this.label);
 
   @override
   Widget build(BuildContext context) {

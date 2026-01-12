@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "743871600386",
+    "project_id": "parknow-ec535",
+    "storage_bucket": "parknow-ec535.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:743871600386:android:4bad4e216cdf888615541b",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCe2JxiY16hg-pXPSmkxvtmGfc53MeW2es"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

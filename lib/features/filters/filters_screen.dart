@@ -1,6 +1,7 @@
 // lib/features/filters/filters_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared/widgets/app_widgets.dart';
 
 class FiltersScreen extends StatefulWidget {
   const FiltersScreen({super.key});
@@ -16,6 +17,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
   bool guard = false;
   bool cameras = false;
   bool lighting = false;
+  bool evCharging = false;
 
   String type = 'Υπόγειο';
 
@@ -26,6 +28,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
       guard = false;
       cameras = false;
       lighting = false;
+      evCharging = false;
       type = 'Υπόγειο';
     });
   }
@@ -94,6 +97,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
             _checkRow(text: 'Φύλακας 24/7', value: guard, onChanged: (v) => setState(() => guard = v)),
             _checkRow(text: 'Κάμερες', value: cameras, onChanged: (v) => setState(() => cameras = v)),
             _checkRow(text: 'Φωτισμός', value: lighting, onChanged: (v) => setState(() => lighting = v)),
+            _checkRow(text: 'Ηλεκτρικός Φορτιστής', value: evCharging, onChanged: (v) => setState(() => evCharging = v)), // New!
             const SizedBox(height: 18),
 
             const Text('Τύπος χώρου', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -169,48 +173,6 @@ class _FiltersScreenState extends State<FiltersScreen> {
       title: Text(text),
       controlAffinity: ListTileControlAffinity.leading,
       activeColor: const Color(0xFF2563EB),
-    );
-  }
-}
-
-// ΣΗΜΑΝΤΙΚΟ: το ChipPill είναι ΕΚΤΟΣ της _FiltersScreenState (όχι μέσα!)
-class ChipPill extends StatelessWidget {
-  final String text;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const ChipPill({
-    super.key,
-    required this.text,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEFF4FF) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? const Color(0xFF2563EB) : const Color(0xFFE5E7EB),
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: selected ? const Color(0xFF2563EB) : Colors.black87,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

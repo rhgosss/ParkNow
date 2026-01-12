@@ -1,12 +1,41 @@
 // lib/features/booking/active_booking_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../../core/data/parking_service.dart';
 
 class ActiveBookingScreen extends StatelessWidget {
-  const ActiveBookingScreen({super.key});
+  final String? bookingId;
+  const ActiveBookingScreen({super.key, this.bookingId});
 
   @override
   Widget build(BuildContext context) {
+    final bookings = ParkingService().bookings;
+    
+    // Find specific booking or get most recent
+    Booking? activeBooking;
+    if (bookingId != null) {
+      try {
+        activeBooking = bookings.firstWhere((b) => b.id == bookingId);
+      } catch (_) {}
+    } else {
+      // Fallback: get most recent active booking
+      final now = DateTime.now();
+      final active = bookings.where((b) => b.endTime.isAfter(now)).toList();
+      activeBooking = active.isNotEmpty ? active.last : null;
+    }
+
+    if (activeBooking == null) {
+       return Scaffold(
+         appBar: AppBar(leading: const BackButton(), title: const Text('Δεν βρέθηκε κράτηση')),
+         body: Center(
+           child: ElevatedButton(onPressed: () => context.go('/main'), child: const Text('Επιστροφή')),
+         ),
+       );
+    }
+
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+
     return Scaffold(
       appBar: AppBar(title: const Text('Ενεργή Κράτηση')),
       body: Padding(
@@ -20,18 +49,46 @@ class ActiveBookingScreen extends StatelessWidget {
                 color: const Color(0xFFDCFCE7),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('PIN Πρόσβασης', style: TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.w800)),
-                  SizedBox(height: 8),
-                  Text('4821', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
-                  SizedBox(height: 6),
-                  Text('Δείξ’ το στον host ή χρησιμοποίησέ το στο keypad.'),
+                  const Text('PIN Πρόσβασης', style: TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Text(activeBooking.pinCode, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Text('Για το: ${activeBooking.spot.title}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(activeBooking.spot.subtitle, style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280))),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${dateFormat.format(activeBooking.startTime)} - ${dateFormat.format(activeBooking.endTime)}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Δείξ\' το στον host ή χρησιμοποίησέ το στο keypad.', style: TextStyle(fontSize: 12)),
                 ],
               ),
             ),
             const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Σύνολο', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    '€${activeBooking.totalPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+            ),
+             const SizedBox(height: 14),
             SizedBox(
               height: 54,
               width: double.infinity,

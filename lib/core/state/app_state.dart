@@ -6,9 +6,19 @@ export '../data/auth_repository.dart' show UserRole;
 
 class AppState extends ChangeNotifier {
   final AuthRepository _auth = AuthRepository();
+  
+  bool _isInitializing = true;
+  bool get isInitializing => _isInitializing;
 
   AppState() {
     _auth.addListener(notifyListeners);
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _auth.tryAutoLogin();
+    _isInitializing = false;
+    notifyListeners();
   }
 
   @override

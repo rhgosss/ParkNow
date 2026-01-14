@@ -37,6 +37,12 @@ GoRouter createRouter(AppState appState) {
     redirect: (context, state) {
       final loc = state.matchedLocation;
 
+      // Wait for initialization to complete
+      if (appState.isInitializing) {
+        // Stay on current route until initialization completes
+        return null;
+      }
+
       final isAuthRoute = loc == '/login' || loc == '/register';
       final isRoleRoute = loc == '/role';
 

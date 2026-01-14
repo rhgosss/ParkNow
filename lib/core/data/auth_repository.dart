@@ -213,6 +213,41 @@ class AuthRepository extends ChangeNotifier {
     _currentUser = null;
     notifyListeners();
   }
+
+  // Try to restore session from Firebase Auth
+  Future<bool> tryAutoLogin() async {
+    // Wait for Firebase Auth to emit the first auth state
+    // On web, currentUser is null immediately even if a session exists
+    final firebaseUser = await _auth.authStateChanges().first;
+    
+    if (firebaseUser == null) {
+      return false;
+    }
+
+    try {
+      final doc = await _db.collection('users').doc(firebaseUser.uid).get();
+      
+      if (doc.exists) {
+        _currentUser = AppUser.fromFirestore(firebaseUser.uid, doc.data()!);
+      } else {
+        // User exists in Auth but not in Firestore - create profile
+        _currentUser = AppUser(
+          id: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          name: 'User',
+          role: UserRole.driver,
+        );
+        await _db.collection('users').doc(firebaseUser.uid).set(_currentUser!.toFirestore());
+      }
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      // Failed to fetch user profile, sign out
+      await _auth.signOut();
+      return false;
+    }
+  }
   
   // Switch role
   Future<void> switchRole() async {

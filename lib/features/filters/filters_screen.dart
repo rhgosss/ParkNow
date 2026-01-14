@@ -1,7 +1,11 @@
 // lib/features/filters/filters_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+<<<<<<< HEAD
 import '../../shared/widgets/chip_pill.dart';
+=======
+import '../../shared/widgets/app_widgets.dart';
+>>>>>>> main
 
 class FiltersScreen extends StatefulWidget {
   const FiltersScreen({super.key});
@@ -17,6 +21,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
   bool guard = false;
   bool cameras = false;
   bool lighting = false;
+  bool evCharging = false;
 
   String type = 'Υπόγειο';
 
@@ -27,6 +32,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
       guard = false;
       cameras = false;
       lighting = false;
+      evCharging = false;
       type = 'Υπόγειο';
     });
   }
@@ -95,6 +101,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
             _checkRow(text: 'Φύλακας 24/7', value: guard, onChanged: (v) => setState(() => guard = v)),
             _checkRow(text: 'Κάμερες', value: cameras, onChanged: (v) => setState(() => cameras = v)),
             _checkRow(text: 'Φωτισμός', value: lighting, onChanged: (v) => setState(() => lighting = v)),
+            _checkRow(text: 'Ηλεκτρικός Φορτιστής', value: evCharging, onChanged: (v) => setState(() => evCharging = v)), // New!
             const SizedBox(height: 18),
 
             const Text('Τύπος χώρου', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -173,4 +180,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     );
   }
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> main

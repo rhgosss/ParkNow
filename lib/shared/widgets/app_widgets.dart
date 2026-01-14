@@ -13,17 +13,36 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
+    return Container(
       width: double.infinity,
+      height: 56, // Slightly taller
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE31C5F), Color(0xFFD30C4D)], // Airbnb-ish mock gradient (Pink/Red) or stick to Blue but bolder
+          // Let's stick to our brand Blue but make it nicer
+          // colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)], 
+        ),
+        borderRadius: BorderRadius.circular(12), // Less rounded, more modern
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF2563EB),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          backgroundColor: const Color(0xFF2563EB), // Fallback
+          shadowColor: Colors.transparent, // Handled by Container
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
         ),
-        child: Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
       ),
     );
   }
@@ -70,6 +89,47 @@ class AppTextField extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class ChipPill extends StatelessWidget {
+  final String text;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  const ChipPill({
+    super.key,
+    required this.text,
+    this.selected = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFEFF4FF) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? const Color(0xFF2563EB) : const Color(0xFFE5E7EB),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: selected ? const Color(0xFF2563EB) : Colors.black87,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

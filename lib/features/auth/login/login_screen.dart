@@ -1,6 +1,7 @@
 // lib/features/auth/login/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/data/auth_repository.dart';
 
 import '../../../core/state/app_state_scope.dart';
 import '../../../shared/widgets/app_widgets.dart';
@@ -15,6 +16,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -60,16 +62,27 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
 
             const SizedBox(height: 10),
-            PrimaryButton(
-              text: 'Σύνδεση',
-              onPressed: () {
-                AppStateScope.of(context).login(
-                  email: emailController.text,
-                  password: passController.text,
-                );
-                context.go('/main');
-              },
-            ),
+              PrimaryButton(
+                text: _isLoading ? 'Σύνδεση...' : 'Σύνδεση',
+                onPressed: _isLoading ? null : () async {
+                  setState(() => _isLoading = true);
+                  try {
+                    await AppStateScope.of(context).login(
+                      emailController.text,
+                      passController.text,
+                    );
+                    if (context.mounted) context.go('/main');
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                      );
+                    }
+                  } finally {
+                    if (mounted) setState(() => _isLoading = false);
+                  }
+                },
+              ),
             const SizedBox(height: 10),
 
             OutlinedButton(

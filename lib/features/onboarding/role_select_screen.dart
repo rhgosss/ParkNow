@@ -6,7 +6,8 @@ import '../../core/state/app_state.dart';
 import '../../core/state/app_state_scope.dart';
 
 class RoleSelectScreen extends StatefulWidget {
-  const RoleSelectScreen({super.key});
+  final Map<String, String> params;
+  const RoleSelectScreen({super.key, this.params = const {}});
 
   @override
   State<RoleSelectScreen> createState() => _RoleSelectScreenState();
@@ -89,10 +90,31 @@ class _RoleSelectScreenState extends State<RoleSelectScreen> {
                   height: 54,
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      final role = selected == 0 ? UserRole.parker : UserRole.host;
-                      AppStateScope.of(context).setRole(role);
-                      context.go('/main');
+                    onPressed: () async {
+                      final role = selected == 0 ? UserRole.driver : UserRole.host;
+                      
+                      if (widget.params.containsKey('email') && widget.params.containsKey('pass')) {
+                         try {
+                           await AppStateScope.of(context).register(
+                             email: widget.params['email']!,
+                             password: widget.params['pass']!,
+                             role: role,
+                             name: widget.params['name'] ?? 'User',
+                             phone: widget.params['phone'] ?? '',
+                           );
+                         } catch (e) {
+                           if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                             );
+                           }
+                           return; // Don't navigate if failed
+                         }
+                      }
+                      
+                      if (context.mounted) {
+                         context.go('/main');
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),

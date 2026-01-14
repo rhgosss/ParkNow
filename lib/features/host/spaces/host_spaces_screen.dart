@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/utils/ui.dart';
+import '../../../core/data/parking_service.dart';
+import '../../../core/state/app_state_scope.dart';
 
 class HostSpacesScreen extends StatefulWidget {
   const HostSpacesScreen({super.key});
@@ -14,6 +16,14 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = AppStateScope.of(context).currentUser;
+    final allSpots = ParkingService().allSpots;
+    
+    // Filter by owner name
+    // For demo simplicity, we match exact string. 
+    // In real app we'd use ID.
+    final mySpots = allSpots.where((s) => s.ownerName == (user?.name ?? '')).toList();
+
     return Scaffold(
       appBar: AppBar(
         leading: const BackButton(),
@@ -30,47 +40,69 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          children: [
-            Row(
-              children: const [
-                Expanded(child: _Kpi(value: '3', label: 'Χώροι')),
-                Expanded(child: _Kpi(value: '25', label: 'Κρατήσεις\nμήνα')),
-                Expanded(child: _Kpi(value: '€369', label: 'Έσοδα μήνα', valueColor: Color(0xFF16A34A))),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            Row(
-              children: [
-                _pillTab('Όλοι (3)', tab == 0, () => setState(() => tab = 0)),
-                const SizedBox(width: 8),
-                _pillTab('Ενεργοί (2)', tab == 1, () => setState(() => tab = 1)),
-                const SizedBox(width: 8),
-                _pillTab('Ανενεργοί (1)', tab == 2, () => setState(() => tab = 2)),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            _spaceCard(
-              onStats: () => context.push('/main'), // ή context.push('/host/stats') αν το κάνεις route
-              onEdit: () => comingSoon(context, 'Επεξεργασία σύντομα'),
-              onMenu: () => comingSoon(context),
-            ),
-
-            const SizedBox(height: 18),
-            SizedBox(
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: () => context.push('/host/new-space'),
-                icon: const Icon(Icons.add),
-                label: const Text('Προσθήκη Νέου Χώρου'),
+        child: mySpots.isEmpty 
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                   const Icon(Icons.garage_outlined, size: 64, color: Colors.grey),
+                   const SizedBox(height: 16),
+                   const Text('Δεν έχεις καταχωρήσει χώρους ακόμα.', style: TextStyle(fontSize: 16)),
+                   const SizedBox(height: 24),
+                   ElevatedButton(
+                     onPressed: () => context.push('/host/new-space'),
+                     child: const Text('Πρόσθεσε τον πρώτο σου χώρο'),
+                   )
+                ],
               ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+              itemCount: mySpots.length + 1, // +1 for header stats
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: _Kpi(value: '${mySpots.length}', label: 'Χώροι')),
+                          const Expanded(child: _Kpi(value: '0', label: 'Κρατήσεις\nμήνα')), // Mock
+                          const Expanded(child: _Kpi(value: '€0', label: 'Έσοδα μήνα', valueColor: Color(0xFF16A34A))), // Mock
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _pillTab('Όλοι (${mySpots.length})', tab == 0, () => setState(() => tab = 0)),
+                          const SizedBox(width: 8),
+                          _pillTab('Ενεργοί', tab == 1, () => setState(() => tab = 1)),
+                          const SizedBox(width: 8),
+                          _pillTab('Ανενεργοί', tab == 2, () => setState(() => tab = 2)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                  );
+                }
+                
+                final spot = mySpots[index - 1];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 18),
+                  child: _spaceCard(
+                    spot: spot,
+                    onStats: () => context.push('/main'), 
+                    onEdit: () => comingSoon(context, 'Επεξεργασία σύντομα'),
+                    onMenu: () => comingSoon(context),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
       ),
+      floatingActionButton: mySpots.isNotEmpty ? FloatingActionButton.extended(
+        onPressed: () => context.push('/host/new-space'),
+        icon: const Icon(Icons.add),
+        label: const Text('Προσθήκη'),
+      ) : null,
     );
   }
 
@@ -90,6 +122,7 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
   }
 
   static Widget _spaceCard({
+    required GarageSpot spot,
     required VoidCallback onStats,
     required VoidCallback onEdit,
     required VoidCallback onMenu,
@@ -107,12 +140,13 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
             child: Stack(
               children: [
-                Image.network(
-                  'https://images.unsplash.com/photo-1486006920555-c77dcf18193c?w=1600',
+                Container(
                   height: 160,
                   width: double.infinity,
-                  fit: BoxFit.cover,
+                  color: Colors.grey.shade200,
+                  child: const Center(child: Icon(Icons.image, size: 50, color: Colors.grey)),
                 ),
+                // If we implemented images in ParkingService, we'd use spot.image
                 Positioned(
                   left: 12,
                   top: 12,
@@ -127,20 +161,6 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
                 ),
                 Positioned(
                   right: 12,
-                  top: 12,
-                  child: InkWell(
-                    onTap: onMenu,
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                      child: const Icon(Icons.more_vert),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 12,
                   bottom: 12,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -148,7 +168,7 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
                       color: const Color(0xFF2563EB),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Text('€6/ημέρα', style: TextStyle(color: Colors.white)),
+                    child: Text('€${spot.pricePerHour.toStringAsFixed(0)}/ώρα', style: const TextStyle(color: Colors.white)),
                   ),
                 ),
               ],
@@ -159,61 +179,13 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Κολωνάκι Parking', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                Text(spot.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
-                const Row(
-                  children: [
-                    Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF6B7280)),
-                    SizedBox(width: 6),
-                    Text('Σόλωνος 45, Αθήνα'),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Row(
-                  children: [
-                    Icon(Icons.star, size: 18, color: Color(0xFFFFC107)),
-                    SizedBox(width: 6),
-                    Text('4.9 (87)'),
-                  ],
-                ),
-                const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF4FF),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Κρατήσεις', style: TextStyle(color: Color(0xFF2563EB))),
-                            SizedBox(height: 6),
-                            Text('12 αυτό τον\nμήνα', style: TextStyle(fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Έσοδα', style: TextStyle(color: Color(0xFF16A34A))),
-                            SizedBox(height: 6),
-                            Text('€156', style: TextStyle(fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                      ),
-                    ),
+                    const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF6B7280)),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text(spot.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis)),
                   ],
                 ),
                 const SizedBox(height: 12),

@@ -1,61 +1,243 @@
 // lib/features/spot/spot_details_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../../core/data/parking_service.dart';
+import '../../../core/state/app_state_scope.dart';
+import '../../../shared/widgets/app_widgets.dart';
 
-class SpotDetailsScreen extends StatelessWidget {
-  const SpotDetailsScreen({super.key});
+class SpotDetailsScreen extends StatefulWidget {
+  final String spotId;
+  const SpotDetailsScreen({super.key, required this.spotId});
+
+  @override
+  State<SpotDetailsScreen> createState() => _SpotDetailsScreenState();
+}
+
+class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
+  bool _isDaily = false;
+  GarageSpot? _spot;
+  Set<Marker> _markers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _spot = ParkingService().getSpot(widget.spotId);
+    if (_spot != null) {
+      _markers = {
+        Marker(markerId: MarkerId(_spot!.id), position: _spot!.pos),
+      };
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_spot == null) {
+      return const Scaffold(body: Center(child: Text('Spot not found')));
+    }
+    final s = _spot!;
+    final price = _isDaily ? s.pricePerDay : s.pricePerHour;
+    final priceLabel = _isDaily ? 'ημέρα' : 'ώρα';
+    final isFavorite = AppStateScope.of(context).isFavorite(s.id);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Λεπτομέρειες')),
+      appBar: AppBar(
+        title: Text(s.title),
+        actions: [
+          IconButton(
+            onPressed: () {
+              AppStateScope.of(context).toggleFavorite(s.id);
+              setState(() {}); // Refresh to update icon
+            },
+            icon: Icon(
+              isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: isFavorite ? Colors.red : null,
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Image.network(
-              'https://images.unsplash.com/photo-1486006920555-c77dcf18193c?w=1400',
-              height: 220,
-              width: double.infinity,
-              fit: BoxFit.cover,
+          // Map Preview
+          SizedBox(
+            height: 250,
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(target: s.pos, zoom: 15),
+                    markers: _markers,
+                    // Interactive Map enabled per user request
+                    scrollGesturesEnabled: true,
+                    zoomGesturesEnabled: true,
+                    rotateGesturesEnabled: true,
+                    myLocationButtonEnabled: false,
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: FloatingActionButton.small(
+                    onPressed: () {
+                         ScaffoldMessenger.of(context).showSnackBar(
+                           const SnackBar(content: Text('Άνοιγμα σε πλήρη οθόνη... (Demo)')),
+                         );
+                    },
+                    backgroundColor: Colors.white,
+                    child: const Icon(Icons.fullscreen, color: Colors.black),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          const Text('Κολωνάκι Parking', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          const Row(
+          const SizedBox(height: 16),
+          
+          // Header Info
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF6B7280)),
-              SizedBox(width: 6),
-              Text('Σόλωνος 45, Αθήνα', style: TextStyle(color: Color(0xFF6B7280))),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text(s.area, style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('€${price.toStringAsFixed(1)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                  Text('/$priceLabel', style: const TextStyle(color: Colors.grey)),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          const Text('Παροχές', style: TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+
+          // Pricing Toggle
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(12)),
+            child: Row(
+              children: [
+                Expanded(child: _toggleBtn('Ανά Ώρα', !_isDaily, () => setState(() => _isDaily = false))),
+                Expanded(child: _toggleBtn('Ανά Ημέρα (Save)', _isDaily, () => setState(() => _isDaily = true))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Owner Info
+          Row(
+            children: [
+              const CircleAvatar(backgroundColor: Color(0xFFE5E7EB), child: Icon(Icons.person, color: Colors.grey)),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Ιδιοκτήτης', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(s.ownerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 32),
+
+          // Facilities
+          const Text('Παροχές', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: const [
-              _Tag('Στεγασμένο'),
-              _Tag('Κάμερες'),
-              _Tag('Φωτισμός'),
+            children: s.features.map((f) => _Tag(f)).toList(),
+          ),
+          const Divider(height: 32),
+
+          // Reviews
+          Row(
+            children: [
+              const Text('Κριτικές', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              const SizedBox(width: 8),
+              const Icon(Icons.star, color: Colors.amber, size: 20),
+              Text(' ${s.rating.toStringAsFixed(1)} (${s.reviewsCount})', style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
+          ...s.reviews.map((r) => _ReviewItem(r)),
+
+          const SizedBox(height: 30),
           SizedBox(
             height: 54,
-            child: ElevatedButton(
-              onPressed: () => context.push('/date'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                elevation: 0,
-              ),
-              child: const Text('Επιλογή ημερομηνίας', style: TextStyle(fontWeight: FontWeight.w800)),
+            child: PrimaryButton(
+              text: 'Επιλογή ημερομηνίας',
+              onPressed: () {
+                 final price = _isDaily ? s.pricePerDay : s.pricePerHour;
+                 final type = _isDaily ? 'day' : 'hour';
+                 // We pass these as query params for simplicity in this demo architecture
+                 context.push(Uri(path: '/date', queryParameters: {
+                   'spotId': s.id,
+                   'price': price.toString(),
+                   'type': type,
+                 }).toString());
+              },
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _toggleBtn(String text, bool active, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: active ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : [],
+        ),
+        alignment: Alignment.center,
+        child: Text(text, style: TextStyle(fontWeight: FontWeight.w600, color: active ? Colors.black : Colors.grey)),
+      ),
+    );
+  }
+}
+
+class _ReviewItem extends StatelessWidget {
+  final Review r;
+  const _ReviewItem(this.r);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(r.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  Text(r.rating.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.bold)),
+                   const Icon(Icons.star, size: 14, color: Colors.amber),
+                ],
+              )
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(r.comment, style: const TextStyle(color: Colors.black87)),
         ],
       ),
     );

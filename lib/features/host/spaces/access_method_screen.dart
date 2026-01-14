@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../../core/data/parking_service.dart';
+import '../../../core/state/app_state_scope.dart';
 
 class AccessMethodScreen extends StatefulWidget {
-  const AccessMethodScreen({super.key});
+  final Map<String, String> params;
+  const AccessMethodScreen({super.key, this.params = const {}});
 
   @override
   State<AccessMethodScreen> createState() => _AccessMethodScreenState();
@@ -85,9 +89,47 @@ class _AccessMethodScreenState extends State<AccessMethodScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => context.push('/host/success'),
+                      onPressed: () async {
+                         final title = widget.params['title'] ?? 'Χωρίς Τίτλο';
+                         final addr = widget.params['addr'] ?? 'Αθήνα';
+                         final price = double.tryParse(widget.params['price'] ?? '5') ?? 5.0;
+                         final currentUser = AppStateScope.of(context).currentUser;
+                         final owner = currentUser?.name ?? 'Me';
+                         
+                         final lat = double.tryParse(widget.params['lat'] ?? '') ?? 37.9838;
+                         final lng = double.tryParse(widget.params['lng'] ?? '') ?? 23.7275;
+                         
+                         // Create Spot with unique ID
+                         final spot = GarageSpot(
+                           id: 'spot_${DateTime.now().millisecondsSinceEpoch}',
+                           title: title,
+                           subtitle: addr,
+                           area: 'Κέντρο',
+                           pricePerHour: price,
+                           pricePerDay: price * 10,
+                           pos: LatLng(lat, lng),
+                           rating: 5.0,
+                           reviewsCount: 0,
+                           features: ['Covered', '24/7'],
+                           ownerName: owner,
+                           reviews: [],
+                           ownerId: currentUser?.id,
+                         );
+                         
+                         // Save to Firestore
+                         await ParkingService().addSpot(spot);
+                         
+                         // Navigate to Success
+                         if (context.mounted) {
+                           context.push(Uri(path: '/host/success', queryParameters: {
+                             'title': title,
+                             'price': widget.params['price'] ?? '5',
+                             'addr': addr,
+                           }).toString());
+                         }
+                      },
                       style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                      child: const Text('Συνέχεια'),
+                      child: const Text('Δημοσίευση'),
                     ),
                   ),
                 ],

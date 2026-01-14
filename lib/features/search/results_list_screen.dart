@@ -1,59 +1,61 @@
 // lib/features/search/results_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/data/parking_service.dart';
+import '../../../core/state/app_state_scope.dart';
 
-class ResultsListScreen extends StatelessWidget {
+class ResultsListScreen extends StatefulWidget {
   final bool showBack;
-  const ResultsListScreen({super.key, required this.showBack});
+  final String? query; // Passed via query params
+
+  const ResultsListScreen({super.key, required this.showBack, this.query});
 
   @override
+  State<ResultsListScreen> createState() => _ResultsListScreenState();
+}
+
+class _ResultsListScreenState extends State<ResultsListScreen> {
+  @override
   Widget build(BuildContext context) {
+    // Get results from service
+    final results = ParkingService().search(widget.query ?? '');
+
     return Scaffold(
       appBar: AppBar(
-        leading: showBack ? const BackButton() : null,
-        title: const Text('Διαθέσιμα Parking'),
+        leading: widget.showBack ? const BackButton() : null,
+        title: Text(widget.query != null && widget.query!.isNotEmpty ? 'Αποτελέσματα: "${widget.query}"' : 'Διαθέσιμα Parking'),
         actions: [
+          IconButton(
+            onPressed: () => context.push('/search/map'),
+            icon: const Icon(Icons.map_outlined),
+          ),
           IconButton(
             onPressed: () => context.push('/filters'),
             icon: const Icon(Icons.tune),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _card(
-            context,
-            image: 'https://images.unsplash.com/photo-1486006920555-c77dcf18193c?w=1400',
-            title: 'Κολωνάκι Parking',
-            area: 'Σόλωνος 45, Αθήνα',
-            price: '€6/ημέρα',
-            rating: '4.9 (87)',
-          ),
-          const SizedBox(height: 12),
-          _card(
-            context,
-            image: 'https://images.unsplash.com/photo-1501179691627-eeaa65ea017c?w=1400',
-            title: 'Σύνταγμα Plaza',
-            area: 'Κέντρο Αθήνας',
-            price: '€8/ημέρα',
-            rating: '4.8 (54)',
-          ),
-        ],
-      ),
+      body: results.isEmpty 
+        ? const Center(child: Text('Δεν βρέθηκαν αποτελέσματα.')) 
+        : ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: results.length,
+          itemBuilder: (context, index) {
+            final spot = results[index];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _card(context, spot),
+            );
+          },
+        ),
     );
   }
 
-  Widget _card(
-    BuildContext context, {
-    required String image,
-    required String title,
-    required String area,
-    required String price,
-    required String rating,
-  }) {
+  Widget _card(BuildContext context, GarageSpot spot) {
+    final isFavorite = AppStateScope.of(context).isFavorite(spot.id);
+    
     return InkWell(
-      onTap: () => context.push('/spot'),
+      onTap: () => context.push('/spot/${spot.id}'),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         decoration: BoxDecoration(
@@ -64,22 +66,53 @@ class ResultsListScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-              child: Image.network(image, height: 170, width: double.infinity, fit: BoxFit.cover),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                  child: Container(
+                    height: 170,
+                    width: double.infinity,
+                    color: Colors.grey[300], // Placeholder color
+                    child: const Icon(Icons.local_parking, size: 60, color: Colors.grey),
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: GestureDetector(
+                    onTap: () {
+                      AppStateScope.of(context).toggleFavorite(spot.id);
+                      setState(() {});
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? Colors.red : Colors.grey,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  Text(spot.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF6B7280)),
                       const SizedBox(width: 6),
-                      Expanded(child: Text(area, style: const TextStyle(color: Color(0xFF6B7280)))),
+                      Expanded(child: Text(spot.subtitle, style: const TextStyle(color: Color(0xFF6B7280)))),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -87,9 +120,9 @@ class ResultsListScreen extends StatelessWidget {
                     children: [
                       const Icon(Icons.star, size: 18, color: Color(0xFFFFC107)),
                       const SizedBox(width: 6),
-                      Text(rating),
+                      Text('${spot.rating.toStringAsFixed(1)} (${spot.reviewsCount})'),
                       const Spacer(),
-                      Text(price, style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w800)),
+                      Text('€${spot.pricePerHour.toStringAsFixed(0)}/ώρα', style: const TextStyle(fontWeight: FontWeight.w800)),
                     ],
                   ),
                 ],

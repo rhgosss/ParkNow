@@ -1,11 +1,38 @@
 import 'package:flutter/material.dart';
 import '../../../shared/utils/ui.dart';
+import '../../../core/data/parking_service.dart';
+import '../../../core/state/app_state_scope.dart';
 
 class HostStatsScreen extends StatelessWidget {
   const HostStatsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = AppStateScope.of(context).currentUser;
+    if (currentUser == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Στατιστικά')),
+        body: const Center(child: Text('Πρέπει να συνδεθείτε')),
+      );
+    }
+
+    // Calculate real stats
+    final allBookings = ParkingService().getBookingsForOwner(currentUser.id);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    
+    final monthlyBookings = allBookings.where((b) => 
+      b.startTime.isAfter(monthStart) && b.startTime.isBefore(now)
+    ).toList();
+    
+    final monthlyIncome = monthlyBookings.fold<double>(
+      0.0, 
+      (sum, booking) => sum + booking.totalPrice
+    );
+
+    final uniqueCustomers = monthlyBookings.map((b) => b.userId).toSet().length;
+    final spotsCount = ParkingService().getSpotsForOwner(currentUser.id).length;
+
     return Scaffold(
       appBar: AppBar(
         leading: const BackButton(),
@@ -38,40 +65,70 @@ class HostStatsScreen extends StatelessWidget {
                 gradient: const LinearGradient(colors: [Color(0xFF16A34A), Color(0xFF22C55E)]),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    children: [
+                    children: const [
                       Icon(Icons.attach_money, color: Colors.white),
                       SizedBox(width: 8),
                       Text('Έσοδα Μήνα', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                      Spacer(),
-                      _Pill('+12%'),
                     ],
                   ),
-                  SizedBox(height: 10),
-                  Text('€438', style: TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w900)),
-                  SizedBox(height: 6),
-                  Text('+€47 από τον προηγούμενο μήνα', style: TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 10),
+                  Text(
+                    '€${monthlyIncome.toStringAsFixed(2)}', 
+                    style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Από ${monthlyBookings.length} κρατήσεις',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
                 ],
               ),
             ),
 
             const SizedBox(height: 14),
             Row(
-              children: const [
-                Expanded(child: _Mini(title: 'Κρατήσεις', value: '25', sub: '+8% από πριν')),
-                SizedBox(width: 10),
-                Expanded(child: _Mini(title: 'Πελάτες', value: '18', sub: '+5 νέοι')),
+              children: [
+                Expanded(
+                  child: _Mini(
+                    title: 'Κρατήσεις', 
+                    value: monthlyBookings.length.toString(), 
+                    sub: 'Αυτόν τον μήνα',
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _Mini(
+                    title: 'Πελάτες', 
+                    value: uniqueCustomers.toString(), 
+                    sub: 'Μοναδικοί',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
             Row(
-              children: const [
-                Expanded(child: _Mini(title: 'Προβολές', value: '342', sub: '+24%')),
-                SizedBox(width: 10),
-                Expanded(child: _Mini(title: 'Conversion', value: '7.3%', sub: '-1.2%')),
+              children: [
+                Expanded(
+                  child: _Mini(
+                    title: 'Χώροι', 
+                    value: spotsCount.toString(), 
+                    sub: 'Ενεργοί',
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _Mini(
+                    title: 'Μέσος Όρος', 
+                    value: monthlyBookings.isEmpty 
+                      ? '€0' 
+                      : '€${(monthlyIncome / monthlyBookings.length).toStringAsFixed(0)}', 
+                    sub: 'Ανά κράτηση',
+                  ),
+                ),
               ],
             ),
 

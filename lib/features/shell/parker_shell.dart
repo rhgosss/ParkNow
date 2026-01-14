@@ -2,8 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/data/parking_service.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../search/results_list_screen.dart';
+import '../profile/profile_tab.dart';
+import '../booking/my_bookings_screen.dart';
 
 class ParkerShell extends StatefulWidget {
   const ParkerShell({super.key});
@@ -18,10 +21,10 @@ class _ParkerShellState extends State<ParkerShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      const _ParkerHomeTab(),
-      const ResultsListScreen(showBack: false), // εδώ είναι οι λίστες με photos
-      const _ParkerBookingsTab(),
-      const _ParkerProfileTab(),
+      _ParkerHomeTab(onSwitchTab: (i) => setState(() => index = i)),
+      const ResultsListScreen(showBack: false),
+      const MyBookingsScreen(), // REAL BOOKINGS
+      const ProfileTab(), // REAL PROFILE
     ];
 
     return Scaffold(
@@ -42,7 +45,8 @@ class _ParkerShellState extends State<ParkerShell> {
 }
 
 class _ParkerHomeTab extends StatelessWidget {
-  const _ParkerHomeTab();
+  final Function(int) onSwitchTab;
+  const _ParkerHomeTab({required this.onSwitchTab});
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +92,7 @@ class _ParkerHomeTab extends StatelessWidget {
                     icon: Icons.my_location,
                     title: 'Κοντά μου',
                     subtitle: 'Αυτόματη εύρεση',
-                    onTap: () => context.go('/results'),
+                    onTap: () => onSwitchTab(1), // Switch to search tab
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -107,30 +111,23 @@ class _ParkerHomeTab extends StatelessWidget {
             const Text('Προτεινόμενα', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
 
-            _spotCard(
-              onTap: () => context.push('/spot'),
-              image:
-                  'https://images.unsplash.com/photo-1501179691627-eeaa65ea017c?w=1200',
-              title: 'Στεγασμένη Θέση Κέντρο',
-              area: 'Κολωνάκι, Αθήνα',
-              price: '8€/ώρα',
-              rating: '4.9',
-            ),
-            const SizedBox(height: 12),
-            _spotCard(
-              onTap: () => context.push('/spot'),
-              image:
-                  'https://images.unsplash.com/photo-1486006920555-c77dcf18193c?w=1200',
-              title: 'Υπόγειο Parking',
-              area: 'Σύνταγμα, Αθήνα',
-              price: '10€/ώρα',
-              rating: '4.8',
-            ),
+            // Get first 2 spots from service
+            ...ParkingService().allSpots.take(2).map((spot) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _spotCard(
+                onTap: () => context.push('/spot/${spot.id}'),
+                image: 'https://images.unsplash.com/photo-1501179691627-eeaa65ea017c?w=1200',
+                title: spot.title,
+                area: spot.subtitle,
+                price: '€${spot.pricePerHour.toStringAsFixed(0)}/ώρα',
+                rating: spot.rating.toStringAsFixed(1),
+              ),
+            )),
 
             const SizedBox(height: 18),
             PrimaryButton(
               text: 'Δες όλα τα διαθέσιμα',
-              onPressed: () => context.go('/results'),
+              onPressed: () => onSwitchTab(1), // Switch to search tab
             ),
           ],
         ),
@@ -230,83 +227,6 @@ class _ParkerHomeTab extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ParkerBookingsTab extends StatelessWidget {
-  const _ParkerBookingsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Κρατήσεις')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Color(0xFF16A34A)),
-                  const SizedBox(width: 10),
-                  const Expanded(child: Text('Έχεις ενεργή κράτηση')),
-                  ElevatedButton(
-                    onPressed: () => context.push('/active-booking'),
-                    child: const Text('Άνοιγμα'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text('Ιστορικό', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 10),
-            _historyRow('Κολωνάκι Parking', '18-20 Νοε', '€13.00'),
-            _historyRow('Σύνταγμα Plaza', '03 Νοε', '€6.00'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _historyRow(String title, String date, String price) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
-              Text(date, style: const TextStyle(color: Color(0xFF6B7280))),
-            ]),
-          ),
-          Text(price, style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2563EB))),
-        ],
-      ),
-    );
-  }
-}
-
-class _ParkerProfileTab extends StatelessWidget {
-  const _ParkerProfileTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Προφίλ')),
-      body: const Center(child: Text('Profile UI (το κρατάμε όπως το έχεις ήδη)')),
     );
   }
 }

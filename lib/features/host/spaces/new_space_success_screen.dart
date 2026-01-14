@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class NewSpaceSuccessScreen extends StatelessWidget {
-  const NewSpaceSuccessScreen({super.key});
+  final Map<String, String> params;
+  const NewSpaceSuccessScreen({super.key, this.params = const {}});
 
   @override
   Widget build(BuildContext context) {
+    final title = params['title'] ?? 'Parking';
+    final addr = params['addr'] ?? 'Αθήνα';
+    final price = params['price'] ?? '5';
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -52,17 +57,17 @@ class NewSpaceSuccessScreen extends StatelessWidget {
                       child: const Center(child: Text('P', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF2563EB)))),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Κολωνάκι\nParking', style: TextStyle(fontWeight: FontWeight.w800)),
-                          SizedBox(height: 4),
+                          Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 4),
                           Row(
                             children: [
-                              Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF6B7280)),
-                              SizedBox(width: 6),
-                              Text('Σόλωνος\n45, Αθήνα', style: TextStyle(color: Color(0xFF6B7280))),
+                              const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF6B7280)),
+                              const SizedBox(width: 6),
+                              Expanded(child: Text(addr, style: const TextStyle(color: Color(0xFF6B7280)), maxLines: 1)),
                             ],
                           ),
                         ],
@@ -91,12 +96,12 @@ class NewSpaceSuccessScreen extends StatelessWidget {
                   color: const Color(0xFFEFF4FF),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Τιμή ενοικίασης', style: TextStyle(color: Color(0xFF2563EB))),
-                    SizedBox(height: 6),
-                    Text('€6/ημέρα', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+                    const Text('Τιμή ενοικίασης', style: TextStyle(color: Color(0xFF2563EB))),
+                    const SizedBox(height: 6),
+                    Text('€$price/ώρα', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
                   ],
                 ),
               ),

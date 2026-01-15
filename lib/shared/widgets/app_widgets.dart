@@ -59,6 +59,7 @@ class AppTextField extends StatelessWidget {
   final bool obscureText;
   final TextInputType? keyboardType;
   final int? maxLines;
+  final Iterable<String>? autofillHints;
 
   const AppTextField({
     super.key,
@@ -68,6 +69,7 @@ class AppTextField extends StatelessWidget {
     this.obscureText = false,
     this.keyboardType,
     this.maxLines,
+    this.autofillHints,
   });
 
   @override
@@ -82,6 +84,7 @@ class AppTextField extends StatelessWidget {
           obscureText: obscureText,
           keyboardType: keyboardType,
           maxLines: obscureText ? 1 : (maxLines ?? 1),
+          autofillHints: autofillHints,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,

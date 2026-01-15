@@ -55,6 +55,10 @@ class _ParkerHomeTab extends StatelessWidget {
         title: const Text('ParkNow'),
         actions: [
           IconButton(
+            onPressed: () => context.push('/messages'),
+            icon: const Icon(Icons.chat_bubble_outline),
+          ),
+          IconButton(
             onPressed: () => context.push('/search'),
             icon: const Icon(Icons.search),
           )

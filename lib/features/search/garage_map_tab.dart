@@ -16,28 +16,31 @@ class _GarageMapTabState extends State<GarageMapTab> {
   GarageSpot? _selected;
   DateTime _filterDate = DateTime.now(); // Default now
 
-  late final List<GarageSpot> _spots = ParkingService().allSpots;
-
   static const LatLng _athensCenter = LatLng(37.9838, 23.7275);
 
   @override
   Widget build(BuildContext context) {
-    final markers = _spots.map((s) => _toMarker(s)).toSet();
+    return StreamBuilder<List<GarageSpot>>(
+      stream: ParkingService().spotsStream,
+      initialData: ParkingService().allSpots,
+      builder: (context, snapshot) {
+        final spots = snapshot.data ?? [];
+        final markers = spots.map((s) => _toMarker(s)).toSet();
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: _athensCenter,
-              zoom: 14,
-            ),
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            markers: markers,
-            onMapCreated: (c) {},
-            onTap: (_) => setState(() => _selected = null),
-          ),
+        return Scaffold(
+          body: Stack(
+            children: [
+              GoogleMap(
+                initialCameraPosition: const CameraPosition(
+                  target: _athensCenter,
+                  zoom: 14,
+                ),
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                markers: markers,
+                onMapCreated: (c) {},
+                onTap: (_) => setState(() => _selected = null),
+              ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -180,9 +183,11 @@ class _GarageMapTabState extends State<GarageMapTab> {
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -38,18 +38,26 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 24),
 
-            AppTextField(
-              label: 'Email',
-              hint: 'email@example.com',
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 12),
-            AppTextField(
-              label: 'Κωδικός',
-              hint: '••••••••',
-              controller: passController,
-              obscureText: true,
+            AutofillGroup(
+              child: Column(
+                children: [
+                  AppTextField(
+                    label: 'Email',
+                    hint: 'email@example.com',
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                  ),
+                  const SizedBox(height: 12),
+                  AppTextField(
+                    label: 'Κωδικός',
+                    hint: '••••••••',
+                    controller: passController,
+                    obscureText: true,
+                    autofillHints: const [AutofillHints.password],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 10),
 

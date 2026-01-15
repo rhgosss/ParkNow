@@ -92,22 +92,60 @@ class ChatService extends ChangeNotifier {
     );
     
     await _db.collection('messages').add(msg.toFirestore());
-    
-    // Mock Host reply logic
-    if (senderId != 'host') {
-       Future.delayed(const Duration(seconds: 2), () async {
-          final reply = ChatMessage(
-            id: '',
-            text: 'Ευχαριστώ για το μήνυμα! Θα απαντήσω σύντομα.',
-            senderId: 'host',
-            senderName: 'Host',
-            conversationId: conversationId,
-            timestamp: DateTime.now(),
-          );
-          await _db.collection('messages').add(reply.toFirestore());
-       });
-    }
   }
 
-  
+  // Create a conversation when booking is made
+  Future<String> createConversationForBooking({
+    required String driverId,
+    required String driverName,
+    required String hostId,
+    required String hostName,
+    required String spotTitle,
+    required String bookingId,
+  }) async {
+    // Convention: conversationId = "driverId_hostId_bookingId"
+    final conversationId = '${driverId}_${hostId}_$bookingId';
+    
+    // Send initial system message
+    final initialMsg = ChatMessage(
+      id: '',
+      text: '🅿️ Νέα κράτηση για "$spotTitle"! Μπορείτε να επικοινωνήσετε εδώ.',
+      senderId: 'system',
+      senderName: 'ParkNow',
+      conversationId: conversationId,
+      timestamp: DateTime.now(),
+    );
+    
+    await _db.collection('messages').add(initialMsg.toFirestore());
+    
+    // Also store conversation metadata for easy lookup
+    await _db.collection('conversations').doc(conversationId).set({
+      'driverId': driverId,
+      'driverName': driverName,
+      'hostId': hostId,
+      'hostName': hostName,
+      'spotTitle': spotTitle,
+      'bookingId': bookingId,
+      'createdAt': Timestamp.now(),
+      'lastMessageAt': Timestamp.now(),
+    });
+    
+    return conversationId;
+  }
+
+  // Get conversations where user is participant (as driver or host)
+  Future<List<Map<String, dynamic>>> getConversationsForUserAsync(String userId) async {
+    // Query where user is driver
+    final asDriver = await _db.collection('conversations')
+        .where('driverId', isEqualTo: userId)
+        .get();
+    
+    // Query where user is host
+    final asHost = await _db.collection('conversations')
+        .where('hostId', isEqualTo: userId)
+        .get();
+    
+    final all = [...asDriver.docs, ...asHost.docs];
+    return all.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+  }
 }

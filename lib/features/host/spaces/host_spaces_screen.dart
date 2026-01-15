@@ -15,94 +15,160 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
   int tab = 0; // 0 all, 1 active, 2 inactive
 
   @override
+  @override
   Widget build(BuildContext context) {
     final user = AppStateScope.of(context).currentUser;
-    final allSpots = ParkingService().allSpots;
-    
-    // Filter by owner name
-    // For demo simplicity, we match exact string. 
-    // In real app we'd use ID.
-    final mySpots = allSpots.where((s) => s.ownerName == (user?.name ?? '')).toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: const BackButton(),
-        title: const Text('Οι Χώροι Μου'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: ElevatedButton.icon(
-              onPressed: () => context.push('/host/new-space'),
-              icon: const Icon(Icons.add),
-              label: const Text('Νέος'),
-            ),
+    return StreamBuilder<List<GarageSpot>>(
+      stream: ParkingService().spotsStream,
+      initialData: ParkingService().allSpots,
+      builder: (context, snapshot) {
+        final allSpots = snapshot.data ?? [];
+        // Filter by owner ID (preferred) or Name
+        final mySpots = allSpots.where((s) => s.ownerId == user?.id || s.ownerName == (user?.name ?? '')).toList();
+
+        // Calculate Stats from real data
+        final activeSpotsCount = mySpots.length;
+        // Mock revenue calculation based on spots price (real app would query bookings)
+        final projectedRevenue = mySpots.fold<double>(0, (sum, spot) => sum + (spot.pricePerHour * 10)); 
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF7F7F7), // Airbnb light grey bg
+          appBar: AppBar(
+            automaticallyImplyLeading: false, // Remove back button
+            title: const Text('My Hosting', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black)),
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: Colors.white,
+            // REMOVED duplicate 'Add' button from actions
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: mySpots.isEmpty 
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                   const Icon(Icons.garage_outlined, size: 64, color: Colors.grey),
-                   const SizedBox(height: 16),
-                   const Text('Δεν έχεις καταχωρήσει χώρους ακόμα.', style: TextStyle(fontSize: 16)),
-                   const SizedBox(height: 24),
-                   ElevatedButton(
-                     onPressed: () => context.push('/host/new-space'),
-                     child: const Text('Πρόσθεσε τον πρώτο σου χώρο'),
-                   )
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-              itemCount: mySpots.length + 1, // +1 for header stats
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Column(
+          body: SafeArea(
+            child: mySpots.isEmpty 
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(child: _Kpi(value: '${mySpots.length}', label: 'Χώροι')),
-                          const Expanded(child: _Kpi(value: '0', label: 'Κρατήσεις\nμήνα')), // Mock
-                          const Expanded(child: _Kpi(value: '€0', label: 'Έσοδα μήνα', valueColor: Color(0xFF16A34A))), // Mock
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _pillTab('Όλοι (${mySpots.length})', tab == 0, () => setState(() => tab = 0)),
-                          const SizedBox(width: 8),
-                          _pillTab('Ενεργοί', tab == 1, () => setState(() => tab = 1)),
-                          const SizedBox(width: 8),
-                          _pillTab('Ανενεργοί', tab == 2, () => setState(() => tab = 2)),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
+                       Icon(Icons.house_siding_rounded, size: 64, color: Colors.grey.shade300),
+                       const SizedBox(height: 16),
+                       const Text('No spaces listed yet.', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                       const SizedBox(height: 8),
+                       const Text('Start earning by listing your parking spot.', style: TextStyle(color: Colors.grey)),
+                       const SizedBox(height: 24),
+                       ElevatedButton(
+                         onPressed: () => context.push('/host/new-space'),
+                         style: ElevatedButton.styleFrom(
+                           backgroundColor: const Color(0xFFE31C5F),
+                           foregroundColor: Colors.white,
+                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                         ),
+                         child: const Text('List your space'),
+                       )
                     ],
-                  );
-                }
-                
-                final spot = mySpots[index - 1];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 18),
-                  child: _spaceCard(
-                    spot: spot,
-                    onStats: () => context.push('/main'), 
-                    onEdit: () => comingSoon(context, 'Επεξεργασία σύντομα'),
-                    onMenu: () => comingSoon(context),
                   ),
-                );
-              },
-            ),
-      ),
-      floatingActionButton: mySpots.isNotEmpty ? FloatingActionButton.extended(
-        onPressed: () => context.push('/host/new-space'),
-        icon: const Icon(Icons.add),
-        label: const Text('Προσθήκη'),
-      ) : null,
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                  itemCount: mySpots.length + 1, 
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                )
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(child: _Kpi(value: '$activeSpotsCount', label: 'Active\nSpaces')),
+                                Container(width: 1, height: 40, color: Colors.grey.shade200),
+                                const Expanded(child: _Kpi(value: '100%', label: 'Response\nRate')), // Mock
+                                Container(width: 1, height: 40, color: Colors.grey.shade200),
+                                Expanded(child: _Kpi(value: '€${projectedRevenue.toStringAsFixed(0)}', label: 'Proj.\nRevenue', valueColor: const Color(0xFF16A34A))),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            children: [
+                               const Text('Your Listings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                               const Spacer(),
+                               Text('${mySpots.length} spaces', style: TextStyle(color: Colors.grey.shade600)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      );
+                    }
+                    
+                    final spot = mySpots[index - 1];
+                    final isBooked = ParkingService().isSpotCurrentlyBooked(spot.id);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: _spaceCard(
+                        spot: spot,
+                        isBooked: isBooked,
+                        onStats: () => context.push('/main'), 
+                        // Link Edit Button
+                        onEdit: () => context.push(Uri(path: '/host/new-space', queryParameters: {
+                          'edit': 'true',
+                          'id': spot.id,
+                          'title': spot.title,
+                          'addr': spot.subtitle,
+                          'price': spot.pricePerHour.toString(),
+                        }).toString()),
+                        onDelete: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Διαγραφή Χώρου'),
+                              content: Text('Είσαι σίγουρος ότι θέλεις να διαγράψεις "${spot.title}";'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Ακύρωση'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  child: const Text('Διαγραφή'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await ParkingService().deleteSpot(spot.id);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Ο χώρος διαγράφηκε.')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => context.push('/host/new-space'),
+            backgroundColor: const Color(0xFFE31C5F),
+            elevation: 4,
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: const Text('List Space', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        );
+      }
     );
   }
 
@@ -123,87 +189,134 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
 
   static Widget _spaceCard({
     required GarageSpot spot,
+    required bool isBooked,
     required VoidCallback onStats,
     required VoidCallback onEdit,
-    required VoidCallback onMenu,
+    required VoidCallback onDelete,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-            child: Stack(
-              children: [
-                Container(
-                  height: 160,
+          // Image Area
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Container(
+                  height: 180,
                   width: double.infinity,
                   color: Colors.grey.shade200,
-                  child: const Center(child: Icon(Icons.image, size: 50, color: Colors.grey)),
+                  // Placeholder for real image
+                  child: spot.imageUrl != null 
+                      ? Image.network(spot.imageUrl!, fit: BoxFit.cover)
+                      : const Center(child: Icon(Icons.image_outlined, size: 64, color: Colors.black12)),
                 ),
-                // If we implemented images in ParkingService, we'd use spot.image
-                Positioned(
-                  left: 12,
-                  top: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16A34A),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Text('Ενεργός', style: TextStyle(color: Colors.white)),
+              ),
+              // Status Badge - BOOKED or FREE
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isBooked ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    isBooked ? 'BOOKED' : 'FREE', 
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white),
                   ),
                 ),
-                Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2563EB),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text('€${spot.pricePerHour.toStringAsFixed(0)}/ώρα', style: const TextStyle(color: Colors.white)),
+              ),
+              // Delete button (top right)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: CircleAvatar(
+                  backgroundColor: Colors.white.withOpacity(0.9),
+                  radius: 16,
+                  child: IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    onPressed: onDelete,
+                    color: Colors.red,
+                    padding: EdgeInsets.zero,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+          
+          // Info Area
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(spot.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
                 Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined, size: 18, color: Color(0xFF6B7280)),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(spot.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onStats,
-                        icon: const Icon(Icons.show_chart),
-                        label: const Text('Stats'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(spot.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.2)),
+                          const SizedBox(height: 4),
+                          Text(spot.subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('€${spot.pricePerHour.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                        const Text('/ ώρα', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ],
+                ),
+                
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Divider(height: 1),
+                ),
+
+                Row(
+                  children: [
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: OutlinedButton(
+                        onPressed: onStats,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          side: BorderSide(color: Colors.grey.shade300),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('Στατιστικά'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
                         onPressed: onEdit,
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Επεξεργασία'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('Επεξεργασία'),
                       ),
                     ),
                   ],

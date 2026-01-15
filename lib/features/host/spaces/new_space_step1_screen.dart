@@ -1,12 +1,16 @@
-// lib/features/host/spaces/new_space_step1_screen.dart
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../../shared/widgets/app_widgets.dart';
 
 class NewSpaceStep1Screen extends StatefulWidget {
-  const NewSpaceStep1Screen({super.key});
+  final Map<String, String>? queryParams; // Receive edit params
+  const NewSpaceStep1Screen({super.key, this.queryParams});
 
   @override
   State<NewSpaceStep1Screen> createState() => _NewSpaceStep1ScreenState();
@@ -21,6 +25,23 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
   // Athens Center Default
   LatLng _selectedPos = const LatLng(37.9838, 23.7275);
   bool _hasSelectedLocation = false;
+  
+  XFile? _selectedImage;
+  Uint8List? _selectedImageBytes; // For web compatibility
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill if editing
+    if (widget.queryParams != null && widget.queryParams!['edit'] == 'true') {
+       titleCtrl.text = widget.queryParams!['title'] ?? '';
+       addressCtrl.text = widget.queryParams!['addr'] ?? '';
+       priceCtrl.text = widget.queryParams!['price'] ?? '';
+       // Simulate location (would ideally pass lat/lng too or geocode address)
+       _hasSelectedLocation = true; 
+    }
+  }
 
   @override
   void dispose() {
@@ -29,6 +50,38 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
     priceCtrl.dispose();
     descCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final bytes = await image.readAsBytes(); // Read as bytes for web
+      setState(() {
+        _selectedImage = image;
+        _selectedImageBytes = bytes;
+      });
+    }
+  }
+
+  Future<void> _geocodeAddress() async {
+    if (addressCtrl.text.isEmpty) return;
+    try {
+      List<Location> locations = await locationFromAddress(addressCtrl.text);
+      if (locations.isNotEmpty) {
+        final loc = locations.first;
+        setState(() {
+          _selectedPos = LatLng(loc.latitude, loc.longitude);
+          _hasSelectedLocation = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Address found! Map updated.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Address not found. Please pick on map.')),
+      );
+    }
   }
 
   Future<void> _pickLocation() async {
@@ -41,9 +94,9 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
       setState(() {
         _selectedPos = result;
         _hasSelectedLocation = true;
-        // Optionally update address text if we had geocoding
+        // Optional: Reverse geocode to get address text if empty
         if (addressCtrl.text.isEmpty) {
-          addressCtrl.text = 'Επιλεγμένη τοποθεσία στο χάρτη';
+           addressCtrl.text = 'Selected Location (${result.latitude.toStringAsFixed(3)}, ${result.longitude.toStringAsFixed(3)})';
         }
       });
     }
@@ -52,29 +105,49 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Νέος Χώρος')),
+      appBar: AppBar(title: const Text('New Parking Space')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           children: [
             const _Progress(step: 1),
             const SizedBox(height: 18),
-            const Text('Βασικές Πληροφορίες', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const Text('Basic Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),
 
-            AppTextField(label: 'Τίτλος', hint: 'π.χ. Στεγασμένη θέση στο κέντρο', controller: titleCtrl),
+            AppTextField(label: 'Title', hint: 'e.g. Covered spot in Centro', controller: titleCtrl),
             const SizedBox(height: 10),
             
             // Address & Map Picker
-            const Text('Διεύθυνση', style: TextStyle(fontWeight: FontWeight.w500)),
+            const Text('Address', style: TextStyle(fontWeight: FontWeight.w500)),
             const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
-                  child: AppTextField(
-                    label: '', // Label handled above
-                    hint: 'Οδός, Αριθμός, Περιοχή', 
-                    controller: addressCtrl
+                  child: Focus(
+                    onFocusChange: (hasFocus) {
+                      if (!hasFocus) _geocodeAddress(); // Geocode on blur
+                    },
+                    child: AppTextField(
+                      label: '', // Label handled above
+                      hint: 'Street, Number, Area', 
+                      controller: addressCtrl
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: _geocodeAddress, // Manual trigger
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 52,
+                    width: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: const Icon(Icons.search, color:  Color(0xFF2563EB)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -102,7 +175,7 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
                     const Icon(Icons.check_circle, size: 14, color: Color(0xFF16A34A)),
                     const SizedBox(width: 4),
                     Text(
-                      'Τοποθεσία επιλέχθηκε: ${_selectedPos.latitude.toStringAsFixed(4)}, ${_selectedPos.longitude.toStringAsFixed(4)}',
+                      'Location confirmed', // Simplified text
                       style: const TextStyle(fontSize: 12, color: Color(0xFF16A34A)),
                     ),
                   ],
@@ -110,26 +183,39 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
               ),
 
             const SizedBox(height: 10),
-            AppTextField(label: 'Τιμή ανά ώρα (€)', hint: '0.00', keyboardType: TextInputType.number, controller: priceCtrl),
+            AppTextField(label: 'Price per Hour (€)', hint: '0.00', keyboardType: TextInputType.number, controller: priceCtrl),
             const SizedBox(height: 10),
-            AppTextField(label: 'Περιγραφή', hint: 'Περιγράψτε τον χώρο σας...', maxLines: 4, controller: descCtrl),
+            AppTextField(label: 'Description', hint: 'Describe your space details...', maxLines: 4, controller: descCtrl),
 
             const SizedBox(height: 14),
-            Container(
-              height: 140,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: const Center(
-                child: Icon(Icons.cloud_upload_outlined, size: 34, color: Color(0xFF6B7280)),
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: 160,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  image: _selectedImageBytes != null ? DecorationImage(
+                    image: MemoryImage(_selectedImageBytes!),
+                    fit: BoxFit.cover,
+                  ) : null,
+                ),
+                child: _selectedImageBytes == null ? const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_photo_alternate_outlined, size: 34, color: Color(0xFF6B7280)),
+                    SizedBox(height: 8),
+                    Text('Upload Photo', style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w600)),
+                  ],
+                ) : null,
               ),
             ),
 
             const SizedBox(height: 18),
             PrimaryButton(
-              text: 'Επόμενο Βήμα',
+              text: 'Next Step',
               onPressed: () {
                 context.push(Uri(path: '/host/access', queryParameters: {
                   'title': titleCtrl.text,
@@ -138,6 +224,7 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
                   'desc': descCtrl.text,
                   'lat': _selectedPos.latitude.toString(),
                   'lng': _selectedPos.longitude.toString(),
+                  // 'imagePath': _selectedImage?.path, // Would need to handle path/upload in next steps
                 }).toString());
               },
             ),

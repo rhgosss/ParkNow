@@ -11,6 +11,7 @@ import '../features/shell/main_gate.dart';
 import '../features/host/spaces/new_space_step1_screen.dart';
 import '../features/host/spaces/access_method_screen.dart';
 import '../features/host/spaces/new_space_success_screen.dart';
+import '../features/host/messages/host_messages_screen.dart';
 
 import '../features/chat/chat_screen.dart';
 import '../features/favorites/favorites_screen.dart';
@@ -129,6 +130,7 @@ GoRoute(
       GoRoute(path: '/favorites', builder: (_, __) => const FavoritesScreen()),
       GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
       GoRoute(path: '/payments', builder: (_, __) => const PaymentsScreen()),
+      GoRoute(path: '/messages', builder: (_, __) => const HostMessagesScreen()),
     ],
   );
 }

@@ -11,128 +11,120 @@ class HostMessagesScreen extends StatefulWidget {
 }
 
 class _HostMessagesScreenState extends State<HostMessagesScreen> {
+  List<Map<String, dynamic>> _conversations = [];
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
-    ChatService().addListener(_refresh);
+    _loadConversations();
   }
-
+  
+  // Reload when returning (in case new messages) - basic implementation
   @override
-  void dispose() {
-    ChatService().removeListener(_refresh);
-    super.dispose();
+  void didChangeDependencies() {
+     super.didChangeDependencies();
+     _loadConversations(); 
   }
 
-  void _refresh() {
-    if (mounted) setState(() {});
+  Future<void> _loadConversations() async {
+    final currentUser = AppStateScope.of(context).currentUser;
+    if (currentUser == null) return;
+    
+    // Also init chat service just in case
+    await ChatService().init();
+
+    final convs = await ChatService().getConversationsForUserAsync(currentUser.id);
+    if (mounted) {
+      setState(() {
+        _conversations = convs;
+        _loading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final currentUser = AppStateScope.of(context).currentUser;
-    if (currentUser == null) return const Scaffold(body: Center(child: Text('Error')));
-
-    final conversationIds = ChatService().getConversationsForUser(currentUser.id);
+    if (currentUser == null) return const Scaffold(body: Center(child: Text('Error: Not logged in')));
 
     return Scaffold(
       appBar: AppBar(
-        leading: const BackButton(),
+        // leading: const BackButton(), // Default back button is fine if pushed
         title: const Text('Μηνύματα'),
+        automaticallyImplyLeading: true,
       ),
-      body: SafeArea(
-        child: conversationIds.isEmpty 
-        ? const Center(child: Text('Δεν υπάρχουν μηνύματα'))
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: conversationIds.length,
-            itemBuilder: (context, index) {
-              final convId = conversationIds[index];
-              final messages = ChatService().getMessages(convId);
-              if (messages.isEmpty) return const SizedBox.shrink();
-
-              // Get last message
-              final lastMsg = messages.last; // Assumes sorted by timestamp ascending
-              
-              // Find other user name
-              String otherName = 'Driver';
-              // Check if there is a message from someone else
-              final otherMsg = messages.firstWhere(
-                (m) => m.senderId != currentUser.id, 
-                orElse: () => messages.first
-              );
-              
-              if (otherMsg.senderId != currentUser.id) {
-                otherName = otherMsg.senderName;
-              } else {
-                 // Try to guess from ID? 
-                 // convId = driverId_hostId
-                 // if currentUser.id == hostId, then driverId is first part
-                 final parts = convId.split('_');
-                 if (parts.length == 2) {
-                    if (currentUser.id == parts[1]) otherName = 'Driver'; 
-                    // If we never received a message from them, we might not know the name. 
-                    // In real app we fetch user profile. 
-                 }
-              }
-
-              return InkWell(
-                onTap: () {
-                   context.push(Uri(path: '/chat', queryParameters: {'id': convId, 'name': otherName}).toString());
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
+      body: _loading 
+          ? const Center(child: CircularProgressIndicator())
+          : _conversations.isEmpty 
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: const Color(0xFFEFF4FF),
-                        child: Text(otherName[0].toUpperCase()),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(child: Text(otherName, style: const TextStyle(fontWeight: FontWeight.w700))),
-                                Text(
-                                  "${lastMsg.timestamp.day}/${lastMsg.timestamp.month} ${lastMsg.timestamp.hour}:${lastMsg.timestamp.minute}", 
-                                  style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(lastMsg.text, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
+                      Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey.shade300),
+                      const SizedBox(height: 16),
+                      const Text('Δεν υπάρχουν μηνύματα', style: TextStyle(color: Colors.grey, fontSize: 16)),
                     ],
                   ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _conversations.length,
+                  itemBuilder: (context, index) {
+                    final convo = _conversations[index];
+                    final String convId = convo['id'];
+                    final String driverId = convo['driverId'] ?? '';
+                    final String driverName = convo['driverName'] ?? 'Driver';
+                    final String hostId = convo['hostId'] ?? '';
+                    final String hostName = convo['hostName'] ?? 'Host';
+                    final String spotTitle = convo['spotTitle'] ?? 'Parking Spot';
+                    
+                    // Identify other user
+                    final bool isMeDriver = currentUser.id == driverId;
+                    final String otherName = isMeDriver ? hostName : driverName;
+                    final String myRoleLabel = isMeDriver ? 'Οδηγός' : 'Host';
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: InkWell(
+                        onTap: () {
+                           context.push(Uri(path: '/chat', queryParameters: {'id': convId, 'name': otherName}).toString());
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: const Color(0xFFEFF4FF),
+                                child: Text(otherName.isNotEmpty ? otherName[0].toUpperCase() : '?', 
+                                    style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(otherName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 4),
+                                    Text(spotTitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right, color: Colors.grey),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-      ),
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  final String text;
-  final bool active;
-  const _Chip({required this.text, required this.active});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFF2563EB) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(text, style: TextStyle(color: active ? Colors.white : Colors.black87)),
     );
   }
 }

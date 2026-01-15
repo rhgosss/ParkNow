@@ -2,8 +2,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/data/parking_service.dart';
+import '../../../core/data/chat_service.dart';
 import '../../../core/state/app_state_scope.dart';
 import '../../../shared/widgets/app_widgets.dart';
 
@@ -90,8 +90,10 @@ class PaymentScreen extends StatelessWidget {
     // Generate unique 4-digit PIN
     final pinCode = (1000 + Random().nextInt(9000)).toString();
     
+    final bookingId = 'b_${DateTime.now().millisecondsSinceEpoch}';
+    
     final booking = Booking(
-      id: 'b_${DateTime.now().millisecondsSinceEpoch}', 
+      id: bookingId, 
       spot: spot, 
       startTime: startTime, 
       endTime: endTime,
@@ -100,6 +102,17 @@ class PaymentScreen extends StatelessWidget {
       pinCode: pinCode,
     );
 
+    // Create booking immediately
     await ParkingService().createBooking(booking);
+    
+    // Create conversation between driver and host
+    await ChatService().createConversationForBooking(
+      driverId: currentUser.id,
+      driverName: currentUser.name,
+      hostId: spot.ownerId ?? 'unknown_host',
+      hostName: spot.ownerName,
+      spotTitle: spot.title,
+      bookingId: bookingId,
+    );
   }
 }

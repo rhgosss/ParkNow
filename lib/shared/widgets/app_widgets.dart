@@ -55,6 +55,9 @@ class AppTextField extends StatelessWidget {
   final bool obscureText;
   final TextInputType? keyboardType;
   final int? maxLines;
+  final ValueChanged<String>? onSubmitted;
+  final TextInputAction? textInputAction;
+  final FocusNode? focusNode;
 
   const AppTextField({
     super.key,
@@ -64,6 +67,9 @@ class AppTextField extends StatelessWidget {
     this.obscureText = false,
     this.keyboardType,
     this.maxLines,
+    this.onSubmitted,
+    this.textInputAction,
+    this.focusNode,
   });
 
   @override
@@ -78,6 +84,9 @@ class AppTextField extends StatelessWidget {
           obscureText: obscureText,
           keyboardType: keyboardType,
           maxLines: obscureText ? 1 : (maxLines ?? 1),
+          onSubmitted: onSubmitted,
+          textInputAction: textInputAction,
+          focusNode: focusNode,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,

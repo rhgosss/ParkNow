@@ -8,6 +8,52 @@ class ParkingService {
   factory ParkingService() => _instance;
   ParkingService._internal() {
     _generateDemoSpots();
+    // Don't load bookings individually here as it's async, 
+    // but ensure we can init later.
+  }
+
+  Future<void> init() async {
+    // Listen to real-time bookings from Firestore
+    _db.collection('bookings').snapshots().listen((snapshot) {
+      _bookings.clear();
+      for (var doc in snapshot.docs) {
+        try {
+          final data = doc.data();
+          final spotId = data['spotId'];
+          var spot = getSpot(spotId);
+          if (spot != null) {
+            _bookings.add(Booking.fromFirestore(doc.id, data, spot));
+          }
+        } catch (e) {
+          print('Error parsing booking ${doc.id}: $e');
+        }
+      }
+      print('ParkingService: Loaded ${_bookings.length} bookings from Firestore');
+      // In a real app with ChangeNotifier, we would notifyListeners() here.
+      // Since this is a singleton service accessed directly, the UI might need to know.
+      // But typically we'd use a StreamBuilder or similar.
+      // For now, this updates the in-memory list which the UI pulls from on build/refresh.
+    });
+  }
+
+  Future<void> _loadBookings() async {
+    final maps = StorageService().loadBookings();
+    _bookings.clear();
+    for (var m in maps) {
+      try {
+        final spotId = m['spotId'];
+        // Try local spots first, then firestore cache
+        var spot = getSpot(spotId);
+        if (spot != null) {
+          _bookings.add(Booking.fromJson(m, spot));
+        } else {
+          // Warning: if spot not found (maybe loaded from firestore later), booking is orphan.
+          // For now, we skip. Ideally we should fetch spot async.
+        }
+      } catch (e) {
+        print('Error parsing booking: $e');
+      }
+    }
   }
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -18,7 +64,6 @@ class ParkingService {
   // Cache for Firestore spots
   List<GarageSpot> _firestoreSpots = [];
   DateTime? _lastFetch;
-
   // Bookings  
   final List<Booking> _bookings = [];
 
@@ -149,9 +194,28 @@ class ParkingService {
 
   // === BOOKINGS ===
 
-  Future<void> addBooking(Booking booking) async {
-    await _db.collection('bookings').doc(booking.id).set(booking.toFirestore());
-    _bookings.add(booking);
+  // === BOOKINGS ===
+
+  Future<void> createBooking(Booking booking) async {
+    // Save to Firestore
+    try {
+      await _db.collection('bookings').doc(booking.id).set(booking.toFirestore());
+      
+      // Also update local list immediately for responsiveness (optional, since stream handles it)
+      // _bookings.add(booking); 
+    } catch (e) {
+      print('Error creating booking: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> cancelBooking(String bookingId) async {
+    try {
+      await _db.collection('bookings').doc(bookingId).update({'active': false});
+      // Local update happens via stream listener automatically
+    } catch (e) {
+      print('Error cancelling booking: $e');
+    }
   }
 
   List<Booking> getBookingsForUser(String userId) {

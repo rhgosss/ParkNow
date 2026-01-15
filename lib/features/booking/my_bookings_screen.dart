@@ -5,8 +5,18 @@ import 'package:intl/intl.dart';
 import '../../core/data/parking_service.dart';
 import '../../core/state/app_state_scope.dart';
 
-class MyBookingsScreen extends StatelessWidget {
+class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
+
+  @override
+  State<MyBookingsScreen> createState() => _MyBookingsScreenState();
+}
+
+class _MyBookingsScreenState extends State<MyBookingsScreen> {
+  // Simple way to force rebuild
+  void _refresh() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,10 +28,13 @@ class MyBookingsScreen extends StatelessWidget {
       );
     }
 
+    // Always fetch fresh data on build
     final allBookings = ParkingService().getBookingsForUser(currentUser.id);
     final now = DateTime.now();
-    final activeBookings = allBookings.where((b) => b.endTime.isAfter(now)).toList();
-    final pastBookings = allBookings.where((b) => b.endTime.isBefore(now)).toList();
+    final activeBookings = allBookings.where((b) => b.active && b.endTime.isAfter(now)).toList();
+    // Only show PAST bookings that were NOT cancelled (active=true but time passed)
+    // User requested cancelled bookings to not be in history.
+    final pastBookings = allBookings.where((b) => b.active && b.endTime.isBefore(now)).toList();
 
     return DefaultTabController(
       length: 2,
@@ -37,8 +50,8 @@ class MyBookingsScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _BookingsList(bookings: activeBookings, isActive: true),
-            _BookingsList(bookings: pastBookings, isActive: false),
+            _BookingsList(bookings: activeBookings, isActive: true, onRefresh: _refresh),
+            _BookingsList(bookings: pastBookings, isActive: false, onRefresh: _refresh),
           ],
         ),
       ),
@@ -49,8 +62,9 @@ class MyBookingsScreen extends StatelessWidget {
 class _BookingsList extends StatelessWidget {
   final List<Booking> bookings;
   final bool isActive;
+  final VoidCallback onRefresh;
 
-  const _BookingsList({required this.bookings, required this.isActive});
+  const _BookingsList({required this.bookings, required this.isActive, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +89,11 @@ class _BookingsList extends StatelessWidget {
       itemCount: bookings.length,
       itemBuilder: (context, index) {
         final booking = bookings[index];
-        return _BookingCard(booking: booking, isActive: isActive);
+        return _BookingCard(
+          booking: booking, 
+          isActive: isActive,
+          onRefresh: onRefresh,
+        );
       },
     );
   }
@@ -84,9 +102,15 @@ class _BookingsList extends StatelessWidget {
 class _BookingCard extends StatelessWidget {
   final Booking booking;
   final bool isActive;
+  final VoidCallback onRefresh;
   final VoidCallback? onReviewSubmitted;
 
-  const _BookingCard({required this.booking, required this.isActive, this.onReviewSubmitted});
+  const _BookingCard({
+    required this.booking, 
+    required this.isActive, 
+    required this.onRefresh,
+    this.onReviewSubmitted,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +196,17 @@ class _BookingCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => _confirmCancellation(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(60, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Ακύρωση'),
+                    ),
                   if (!isActive)
                     OutlinedButton.icon(
                       onPressed: () => _showReviewDialog(context),
@@ -194,6 +229,28 @@ class _BookingCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmCancellation(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ακύρωση κράτησης;'),
+        content: const Text('Η θέση θα ελευθερωθεί και η κράτηση θα ακυρωθεί.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Όχι')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ναι, Ακύρωση')),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ParkingService().cancelBooking(booking.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Η κράτηση ακυρώθηκε.')));
+        onRefresh();
+      }
+    }
   }
 
   void _showReviewDialog(BuildContext context) {

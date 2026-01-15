@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/data/parking_service.dart';
+import '../../../core/state/app_state_scope.dart';
 
 class ActiveBookingScreen extends StatelessWidget {
   final String? bookingId;
@@ -93,7 +94,13 @@ class ActiveBookingScreen extends StatelessWidget {
               height: 54,
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => context.push('/chat'),
+                onPressed: () {
+                  final user = AppStateScope.of(context).currentUser;
+                  if (user != null) {
+                    final chatId = '${user.id}_${activeBooking!.spot.ownerId}';
+                    context.push(Uri(path: '/chat', queryParameters: {'id': chatId, 'name': 'Host'}).toString());
+                  }
+                },
                 icon: const Icon(Icons.chat_bubble_outline),
                 label: const Text('Μήνυμα στον Host'),
               ),

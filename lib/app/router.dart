@@ -118,7 +118,14 @@ GoRoute(
 
       GoRoute(path: '/filters', builder: (_, __) => const FiltersScreen()),
       GoRoute(path: '/reviews', builder: (_, __) => const ReviewsScreen()),
-      GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
+      GoRoute(
+        path: '/chat', 
+        builder: (context, state) {
+          final id = state.uri.queryParameters['id'] ?? 'default';
+          final name = state.uri.queryParameters['name'] ?? 'Chat';
+          return ChatScreen(conversationId: id, otherUserName: name);
+        },
+      ),
       GoRoute(path: '/favorites', builder: (_, __) => const FavoritesScreen()),
       GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
       GoRoute(path: '/payments', builder: (_, __) => const PaymentsScreen()),

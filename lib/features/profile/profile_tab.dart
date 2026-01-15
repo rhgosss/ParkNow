@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/state/app_state_scope.dart';
 import '../../core/data/parking_service.dart';
+import '../../core/data/auth_repository.dart';
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
@@ -97,6 +98,17 @@ class ProfileTab extends StatelessWidget {
               icon: Icons.payments_outlined, 
               text: 'Πληρωμές', 
               onTap: () => context.push('/payments'),
+            ),
+            const SizedBox(height: 10),
+            _menuTile(
+              icon: Icons.swap_horiz, 
+              text: currentUser.role == UserRole.driver ? 'Λειτουργία Host' : 'Λειτουργία Driver', 
+              onTap: () async {
+                AppStateScope.of(context).switchRole();
+                ScaffoldMessenger.of(context).showSnackBar(
+                   SnackBar(content: Text('Η λειτουργία άλλαξε σε ${currentUser.role == UserRole.driver ? "Host" : "Driver"}')),
+                );
+              },
             ),
           ],
         ),

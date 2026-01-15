@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../core/data/chat_service.dart';
+import '../../core/state/app_state_scope.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String conversationId;
+  final String otherUserName;
+  
+  const ChatScreen({
+    super.key, 
+    this.conversationId = 'default',
+    this.otherUserName = 'Chat',
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -9,61 +19,99 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final ctrl = TextEditingController();
-  final List<_Msg> msgs = [
-    _Msg(false, 'Γεια σου! Ευχαριστώ για την κράτηση. Είμαι στη διάθεσή σου για οποιαδήποτε ερώτηση!', '10:30'),
-    _Msg(true, 'Γεια σου Νίκο! Θα φτάσω γύρω στις 14:00. Υπάρχει κάτι συγκεκριμένο που πρέπει να γνωρίζω;', '10:45'),
-  ];
+  final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    ChatService().addListener(_onChatUpdate);
+    // Ensure initialized
+    ChatService().init();
+  }
 
   @override
   void dispose() {
+    ChatService().removeListener(_onChatUpdate);
     ctrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
-  void send() {
-    final text = ctrl.text.trim();
-    if (text.isEmpty) return;
-    setState(() => msgs.add(_Msg(true, text, _now())));
-    ctrl.clear();
+  void _onChatUpdate() {
+    if (mounted) setState(() {});
+    // Scroll to bottom after frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
-  String _now() {
-    final n = DateTime.now();
-    final hh = n.hour.toString().padLeft(2, '0');
-    final mm = n.minute.toString().padLeft(2, '0');
-    return '$hh:$mm';
+  Future<void> send() async {
+    final text = ctrl.text.trim();
+    if (text.isEmpty) return;
+
+    final user = AppStateScope.of(context).currentUser;
+    final senderId = user?.id ?? 'guest';
+    final senderName = user?.name ?? 'Guest';
+
+    ctrl.clear();
+    await ChatService().sendMessage(text, senderId, senderName, widget.conversationId);
   }
 
   @override
   Widget build(BuildContext context) {
+    final messages = ChatService().getMessages(widget.conversationId);
+    final user = AppStateScope.of(context).currentUser;
+    final myId = user?.id;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat')),
+      appBar: AppBar(title: Text(widget.otherUserName)),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
-              child: ListView.builder(
+              child: messages.isEmpty 
+              ? const Center(child: Text('Δεν υπάρχουν μηνύματα', style: TextStyle(color: Colors.grey)))
+              : ListView.builder(
+                controller: _scrollCtrl,
                 padding: const EdgeInsets.all(16),
-                itemCount: msgs.length,
+                itemCount: messages.length,
                 itemBuilder: (_, i) {
-                  final m = msgs[i];
+                  final m = messages[i];
+                  // Determine if 'me' based on senderId
+                  // If senderId == myId => me. 
+                  // If senderId == 'host' => other (unless I am host, but simplifiction: I am always 'me')
+                  // Logic: if m.senderId != 'host' => it was sent by user. 
+                  // If current user is host, they should see 'host' messages as 'me'?
+                  // Let's assume current view is USER view.
+                  // User = me, Host = other.
+                  // If m.senderId != 'host' -> me.
+                  
+                  final isMe = m.senderId != 'host';
+                  final timeStr = DateFormat('HH:mm').format(m.timestamp);
+
                   return Align(
-                    alignment: m.me ? Alignment.centerRight : Alignment.centerLeft,
+                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(12),
                       constraints: const BoxConstraints(maxWidth: 280),
                       decoration: BoxDecoration(
-                        color: m.me ? const Color(0xFF2563EB) : Colors.white,
+                        color: isMe ? const Color(0xFF2563EB) : Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(m.text, style: TextStyle(color: m.me ? Colors.white : Colors.black87)),
+                          Text(m.text, style: TextStyle(color: isMe ? Colors.white : Colors.black87)),
                           const SizedBox(height: 6),
-                          Text(m.time, style: TextStyle(color: m.me ? Colors.white70 : const Color(0xFF6B7280), fontSize: 12)),
+                          Text(timeStr, style: TextStyle(color: isMe ? Colors.white70 : const Color(0xFF6B7280), fontSize: 12)),
                         ],
                       ),
                     ),
@@ -104,11 +152,4 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-}
-
-class _Msg {
-  final bool me;
-  final String text;
-  final String time;
-  _Msg(this.me, this.text, this.time);
 }

@@ -18,16 +18,20 @@ class PrimaryButton extends StatelessWidget {
       height: 56, // Slightly taller
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFE31C5F), Color(0xFFD30C4D)], // Airbnb-ish mock gradient (Pink/Red) or stick to Blue but bolder
-          // Let's stick to our brand Blue but make it nicer
-          // colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)], 
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF3B82F6), // Blue 500
+            Color(0xFF2563EB), // Blue 600
+            Color(0xFF1D4ED8), // Blue 700
+          ],
         ),
         borderRadius: BorderRadius.circular(12), // Less rounded, more modern
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF2563EB).withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -36,7 +40,7 @@ class PrimaryButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF2563EB), // Fallback
           shadowColor: Colors.transparent, // Handled by Container
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
         ),
         child: Text(

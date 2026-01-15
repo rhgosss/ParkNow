@@ -42,9 +42,9 @@ class PaymentScreen extends StatelessWidget {
               height: 54,
               child: PrimaryButton(
                 text: 'Πληρωμή με κάρτα',
-                onPressed: () {
-                   _simulateBooking(context);
-                   context.push('/payment-card');
+                onPressed: () async {
+                   await _createBooking(context);
+                   if (context.mounted) context.push('/payment-card');
                 },
               ),
             ),
@@ -53,9 +53,9 @@ class PaymentScreen extends StatelessWidget {
               height: 54,
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () {
-                  _simulateBooking(context);
-                  context.go('/active-booking');
+                onPressed: () async {
+                  await _createBooking(context);
+                  if (context.mounted) context.go('/active-booking');
                 },
                 style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 child: const Text('Πληρωμή στο κατάστημα (demo)'),
@@ -67,7 +67,7 @@ class PaymentScreen extends StatelessWidget {
     );
   }
 
-  void _simulateBooking(BuildContext context) {
+  Future<void> _createBooking(BuildContext context) async {
     if (params['spotId'] == null) return;
     
     final spot = ParkingService().getSpot(params['spotId']!);
@@ -100,6 +100,6 @@ class PaymentScreen extends StatelessWidget {
       pinCode: pinCode,
     );
 
-    ParkingService().addBooking(booking);
+    await ParkingService().createBooking(booking);
   }
 }

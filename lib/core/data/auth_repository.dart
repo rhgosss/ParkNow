@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'storage_service.dart';
 
 enum UserRole { driver, host }
 
@@ -81,6 +82,31 @@ class AuthRepository extends ChangeNotifier {
 
   AppUser? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
+  
+  // Init: Restore session
+  Future<void> init() async {
+    // 1. Check StorageService for saved session
+    await StorageService().init();
+    final savedUid = StorageService().getSession();
+    
+    if (savedUid != null) {
+      // Try to fetch user from Firestore
+      // Or if we had local mock storage for users, fetch there.
+      // Since we use Firestore for users, we try that.
+      try {
+        final doc = await _db.collection('users').doc(savedUid).get();
+        if (doc.exists) {
+           _currentUser = AppUser.fromFirestore(savedUid, doc.data()!);
+           notifyListeners();
+        } else {
+           // User ID saved but not in DB? Weird. Clear session.
+           await StorageService().clearSession();
+        }
+      } catch (e) {
+        print('Error restoring session: $e');
+      }
+    }
+  }
 
   // Validate email format
   static String? validateEmail(String email) {
@@ -169,6 +195,9 @@ class AuthRepository extends ChangeNotifier {
       await _db.collection('users').doc(uid).set(newUser.toFirestore());
       
       _currentUser = newUser;
+      
+      // Save Session
+      await StorageService().saveSession(uid);
       notifyListeners();
     } on FirebaseAuthException catch (e) {
       throw _handleAuthError(e);
@@ -201,6 +230,8 @@ class AuthRepository extends ChangeNotifier {
         await _db.collection('users').doc(uid).set(_currentUser!.toFirestore());
       }
       
+      // Save Session
+      await StorageService().saveSession(uid);
       notifyListeners();
     } on FirebaseAuthException catch (e) {
       throw _handleAuthError(e);
@@ -208,9 +239,11 @@ class AuthRepository extends ChangeNotifier {
   }
 
   // Logout
+  // Logout
   Future<void> logout() async {
     await _auth.signOut();
     _currentUser = null;
+    await StorageService().clearSession();
     notifyListeners();
   }
   

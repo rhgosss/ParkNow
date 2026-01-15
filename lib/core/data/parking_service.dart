@@ -3,11 +3,59 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'storage_service.dart';
+
 class ParkingService {
   static final ParkingService _instance = ParkingService._internal();
   factory ParkingService() => _instance;
   ParkingService._internal() {
     _generateDemoSpots();
+    // Don't load bookings individually here as it's async, 
+    // but ensure we can init later.
+  }
+
+  Future<void> init() async {
+    // Listen to real-time bookings from Firestore
+    _db.collection('bookings').snapshots().listen((snapshot) {
+      _bookings.clear();
+      for (var doc in snapshot.docs) {
+        try {
+          final data = doc.data();
+          final spotId = data['spotId'];
+          var spot = getSpot(spotId);
+          if (spot != null) {
+            _bookings.add(Booking.fromFirestore(doc.id, data, spot));
+          }
+        } catch (e) {
+          print('Error parsing booking ${doc.id}: $e');
+        }
+      }
+      print('ParkingService: Loaded ${_bookings.length} bookings from Firestore');
+      // In a real app with ChangeNotifier, we would notifyListeners() here.
+      // Since this is a singleton service accessed directly, the UI might need to know.
+      // But typically we'd use a StreamBuilder or similar.
+      // For now, this updates the in-memory list which the UI pulls from on build/refresh.
+    });
+  }
+
+  Future<void> _loadBookings() async {
+    final maps = StorageService().loadBookings();
+    _bookings.clear();
+    for (var m in maps) {
+      try {
+        final spotId = m['spotId'];
+        // Try local spots first, then firestore cache
+        var spot = getSpot(spotId);
+        if (spot != null) {
+          _bookings.add(Booking.fromJson(m, spot));
+        } else {
+          // Warning: if spot not found (maybe loaded from firestore later), booking is orphan.
+          // For now, we skip. Ideally we should fetch spot async.
+        }
+      } catch (e) {
+        print('Error parsing booking: $e');
+      }
+    }
   }
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -149,31 +197,40 @@ class ParkingService {
 
   // === BOOKINGS ===
 
-  Future<void> addBooking(Booking booking) async {
-    await _db.collection('bookings').doc(booking.id).set(booking.toFirestore());
-    _bookings.add(booking);
+  // === BOOKINGS ===
+
+  Future<void> createBooking(Booking booking) async {
+    // Save to Firestore
+    try {
+      await _db.collection('bookings').doc(booking.id).set(booking.toFirestore());
+      
+      // Also update local list immediately for responsiveness (optional, since stream handles it)
+      // _bookings.add(booking); 
+    } catch (e) {
+      print('Error creating booking: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> cancelBooking(String bookingId) async {
+    try {
+      await _db.collection('bookings').doc(bookingId).update({'active': false});
+      // Local update happens via stream listener automatically
+    } catch (e) {
+      print('Error cancelling booking: $e');
+    }
   }
 
   List<Booking> getBookingsForUser(String userId) {
     return _bookings.where((b) => b.userId == userId).toList();
   }
-
+  
+  // Replaces async get for consistent API (local is sync-like after init)
   Future<List<Booking>> getBookingsForUserAsync(String userId) async {
-    final snapshot = await _db.collection('bookings')
-        .where('userId', isEqualTo: userId)
-        .get();
-    
-    List<Booking> bookings = [];
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      final spot = await getSpotAsync(data['spotId']);
-      if (spot != null) {
-        bookings.add(Booking.fromFirestore(doc.id, data, spot));
-      }
-    }
-    return bookings;
+    return getBookingsForUser(userId);
   }
 
+  // Get active bookings for user
   List<Booking> getActiveBookingsForUser(String userId) {
     final now = DateTime.now();
     return _bookings.where((b) => 
@@ -194,16 +251,22 @@ class ParkingService {
   // === AVAILABILITY ===
 
   bool isSpotAvailable(String spotId, DateTime date) {
-    final requestedEnd = date.add(const Duration(hours: 2));
+    // 2. CHECK REAL BOOKINGS (Logic 1 from user request)
+    // If there is ANY overlap with an existing active booking, it's unavailable.
     
+    final requestedEnd = date.add(const Duration(hours: 2)); // Default check duration if single point
+
     for (var b in _bookings) {
       if (b.spot.id == spotId && b.active) {
-        if (date.isBefore(b.endTime) && requestedEnd.isAfter(b.startTime)) {
-          return false;
-        }
+         // Conflict if:
+         // New Start < Old End AND New End > Old Start
+         if (date.isBefore(b.endTime) && requestedEnd.isAfter(b.startTime)) {
+           return false; // Actually booked!
+         }
       }
     }
-    
+
+    // 3. Fallback to random for unbooked spots (to simulate busy city)
     final seed = spotId.hashCode + date.day + date.hour;
     final rnd = Random(seed);
     return rnd.nextDouble() < 0.7;
@@ -228,6 +291,7 @@ class ParkingService {
 
     final featuresList = ['Covered', 'Cameras', 'Guard', 'Lighting', 'EV Charging', '24/7'];
     final owners = ['Γιώργος Π.', 'ParknGo AE', 'CitySpots', 'Μαρία Κ.', 'Athens Parking'];
+    final ownerIds = ['host_george', 'host_parkngo', 'host_city', 'host_maria', 'host_athens'];
 
     int idCounter = 1;
     for (var area in areas) {
@@ -257,6 +321,7 @@ class ParkingService {
           features: feats,
           ownerName: owners[rnd.nextInt(owners.length)],
           reviews: reviews,
+          ownerId: ownerIds[rnd.nextInt(ownerIds.length)],
         ));
       }
     }
@@ -412,6 +477,32 @@ class Booking {
       'userId': userId,
       'pinCode': pinCode,
     };
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'spotId': spot.id,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime.toIso8601String(),
+      'totalPrice': totalPrice,
+      'active': active,
+      'userId': userId,
+      'pinCode': pinCode,
+    };
+  }
+
+  factory Booking.fromJson(Map<String, dynamic> json, GarageSpot spot) {
+    return Booking(
+      id: json['id'] ?? '', // Handle legacy/missing id
+      spot: spot,
+      startTime: DateTime.parse(json['startTime']),
+      endTime: DateTime.parse(json['endTime']),
+      totalPrice: (json['totalPrice'] as num).toDouble(),
+      active: json['active'] ?? true,
+      userId: json['userId'] ?? '',
+      pinCode: json['pinCode'] ?? '',
+    );
   }
 
   factory Booking.fromFirestore(String id, Map<String, dynamic> data, GarageSpot spot) {

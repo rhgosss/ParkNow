@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
-<<<<<<< HEAD
-import '../../screens/admin/admin_dashboard_screen.dart';
-=======
 import '../../core/state/app_state_scope.dart';
 import '../../core/data/parking_service.dart';
->>>>>>> main
 
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
@@ -68,17 +64,10 @@ class ProfileTab extends StatelessWidget {
                   const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-<<<<<<< HEAD
-                    children: const [
-                      ProfileStat('12', 'Κρατήσεις'),
-                      SizedBox(width: 30),
-                      ProfileStat('5', 'Αξιολογήσεις'),
-=======
                     children: [
                       _StatItem(bookingCount.toString(), 'Κρατήσεις'),
                       const SizedBox(width: 30),
                       const _StatItem('5', 'Αξιολογήσεις'),
->>>>>>> main
                     ],
                   ),
                 ],
@@ -104,23 +93,16 @@ class ProfileTab extends StatelessWidget {
               onTap: () => context.push('/favorites'),
             ),
             const SizedBox(height: 10),
-<<<<<<< HEAD
-            _menuTile(icon: Icons.payments_outlined, text: 'Πληρωμές', onTap: () {}),
-            const SizedBox(height: 10),
-            _menuTile(
-              icon: Icons.admin_panel_settings_outlined,
-              text: 'Admin Dashboard',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const AdminDashboardScreen(),
-                ),
-              ),
-=======
             _menuTile(
               icon: Icons.payments_outlined, 
               text: 'Πληρωμές', 
               onTap: () => context.push('/payments'),
->>>>>>> main
+            ),
+            const SizedBox(height: 10),
+            _menuTile(
+              icon: Icons.admin_panel_settings_outlined,
+              text: 'Admin Dashboard',
+              onTap: () => context.push('/admin'),
             ),
           ],
         ),
@@ -160,17 +142,10 @@ class ProfileTab extends StatelessWidget {
   }
 }
 
-<<<<<<< HEAD
-class ProfileStat extends StatelessWidget {
-  final String number;
-  final String label;
-  const ProfileStat(this.number, this.label, {super.key});
-=======
 class _StatItem extends StatelessWidget {
   final String number;
   final String label;
   const _StatItem(this.number, this.label);
->>>>>>> main
 
   @override
   Widget build(BuildContext context) {

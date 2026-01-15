@@ -1,11 +1,7 @@
 // lib/features/filters/filters_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-<<<<<<< HEAD
-import '../../shared/widgets/chip_pill.dart';
-=======
 import '../../shared/widgets/app_widgets.dart';
->>>>>>> main
 
 class FiltersScreen extends StatefulWidget {
   const FiltersScreen({super.key});
@@ -180,7 +176,3 @@ class _FiltersScreenState extends State<FiltersScreen> {
     );
   }
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> main

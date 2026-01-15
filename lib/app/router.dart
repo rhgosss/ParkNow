@@ -3,7 +3,6 @@ import '../screens/users_db_view_screen.dart';
 import '../screens/parking_spots_db_view_screen.dart';
 import '../screens/admin/admin_dashboard_screen.dart';
 
-
 import '../core/state/app_state.dart';
 import '../features/search/garage_map_screen.dart';
 
@@ -65,38 +64,6 @@ GoRouter createRouter(AppState appState) {
       return null;
     },
     routes: [
-<<<<<<< HEAD
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
-      GoRoute(path: '/role', builder: (context, state) => const RoleSelectScreen()),
-      GoRoute(path: '/search', builder: (context, state) => const SearchOverlayScreen()),
-GoRoute(path: '/results', builder: (context, state) => const ResultsListScreen(showBack: true)),
-GoRoute(path: '/spot', builder: (context, state) => const SpotDetailsScreen()),
-GoRoute(path: '/date', builder: (context, state) => const DatePickerScreen()),
-GoRoute(path: '/payment', builder: (context, state) => const PaymentScreen()),
-GoRoute(path: '/payment-card', builder: (context, state) => const CardPaymentScreen()),
-GoRoute(path: '/active-booking', builder: (context, state) => const ActiveBookingScreen()),
-      GoRoute(path: '/main', builder: (context, state) => const MainGate()),
-      GoRoute(
-  path: '/debug/users',
-  builder: (context, state) => const UsersDbViewScreen(),
-),
-
-      // Admin
-      GoRoute(path: '/admin', builder: (context, state) => const AdminDashboardScreen()),
-      GoRoute(path: '/admin/users', builder: (context, state) => const UsersDbViewScreen()),
-      GoRoute(path: '/admin/spots', builder: (context, state) => const ParkingSpotsDbViewScreen()),
-
-      // Host new space flow
-      GoRoute(path: '/host/new-space', builder: (context, state) => const NewSpaceStep1Screen()),
-      GoRoute(path: '/host/access', builder: (context, state) => const AccessMethodScreen()),
-      GoRoute(path: '/host/success', builder: (context, state) => const NewSpaceSuccessScreen()),
-
-      // Utilities
-      GoRoute(path: '/filters', builder: (context, state) => const FiltersScreen()),
-      GoRoute(path: '/reviews', builder: (context, state) => const ReviewsScreen()),
-      GoRoute(path: '/chat', builder: (context, state) => const ChatScreen()),
-=======
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
       GoRoute(
@@ -144,6 +111,13 @@ GoRoute(path: '/active-booking', builder: (context, state) => const ActiveBookin
       ),
       GoRoute(path: '/my-bookings', builder: (_, __) => const MyBookingsScreen()),
 
+      // Admin routes
+      GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
+      GoRoute(path: '/admin/users', builder: (_, __) => const UsersDbViewScreen()),
+      GoRoute(path: '/admin/spots', builder: (_, __) => const ParkingSpotsDbViewScreen()),
+      GoRoute(path: '/debug/users', builder: (_, __) => const UsersDbViewScreen()),
+
+      // Host new space flow
       GoRoute(path: '/host/new-space', builder: (_, __) => const NewSpaceStep1Screen()),
       GoRoute(
         path: '/host/access', 
@@ -153,18 +127,18 @@ GoRoute(path: '/active-booking', builder: (context, state) => const ActiveBookin
         path: '/host/success', 
         builder: (context, state) => NewSpaceSuccessScreen(params: state.uri.queryParameters),
       ),
-GoRoute(
-  path: '/search/map',
-  builder: (_, __) => const GarageMapScreen(),
-),
+      GoRoute(
+        path: '/search/map',
+        builder: (_, __) => const GarageMapScreen(),
+      ),
 
+      // Utilities
       GoRoute(path: '/filters', builder: (_, __) => const FiltersScreen()),
       GoRoute(path: '/reviews', builder: (_, __) => const ReviewsScreen()),
       GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
       GoRoute(path: '/favorites', builder: (_, __) => const FavoritesScreen()),
       GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
       GoRoute(path: '/payments', builder: (_, __) => const PaymentsScreen()),
->>>>>>> main
     ],
   );
 }

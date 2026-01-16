@@ -6,21 +6,40 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 class ParkingService {
   static final ParkingService _instance = ParkingService._internal();
   factory ParkingService() => _instance;
+
   ParkingService._internal() {
     _generateDemoSpots();
-    // Don't load bookings individually here as it's async, 
-    // but ensure we can init later.
+    // Firestore bookings load via init() stream listener.
   }
+
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // Local demo spots (in-memory)
+  final List<GarageSpot> _demoSpots = [];
+
+  // Cache for Firestore spots
+  List<GarageSpot> _firestoreSpots = [];
+  DateTime? _lastFetch;
+
+  // Bookings
+  final List<Booking> _bookings = [];
+
+  List<GarageSpot> get allSpots => [..._demoSpots, ..._firestoreSpots];
+  List<Booking> get bookings => List.unmodifiable(_bookings);
 
   Future<void> init() async {
     // Listen to real-time bookings from Firestore
     _db.collection('bookings').snapshots().listen((snapshot) {
       _bookings.clear();
+
       for (var doc in snapshot.docs) {
         try {
           final data = doc.data();
           final spotId = data['spotId'];
-          var spot = getSpot(spotId);
+
+          if (spotId == null) continue;
+
+          final spot = getSpot(spotId);
           if (spot != null) {
             _bookings.add(Booking.fromFirestore(doc.id, data, spot));
           }
@@ -28,56 +47,22 @@ class ParkingService {
           print('Error parsing booking ${doc.id}: $e');
         }
       }
+
       print('ParkingService: Loaded ${_bookings.length} bookings from Firestore');
-      // In a real app with ChangeNotifier, we would notifyListeners() here.
-      // Since this is a singleton service accessed directly, the UI might need to know.
-      // But typically we'd use a StreamBuilder or similar.
-      // For now, this updates the in-memory list which the UI pulls from on build/refresh.
     });
   }
-
-  Future<void> _loadBookings() async {
-    final maps = StorageService().loadBookings();
-    _bookings.clear();
-    for (var m in maps) {
-      try {
-        final spotId = m['spotId'];
-        // Try local spots first, then firestore cache
-        var spot = getSpot(spotId);
-        if (spot != null) {
-          _bookings.add(Booking.fromJson(m, spot));
-        } else {
-          // Warning: if spot not found (maybe loaded from firestore later), booking is orphan.
-          // For now, we skip. Ideally we should fetch spot async.
-        }
-      } catch (e) {
-        print('Error parsing booking: $e');
-      }
-    }
-  }
-
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  
-  // Local demo spots (in-memory)
-  final List<GarageSpot> _demoSpots = [];
-  
-  // Cache for Firestore spots
-  List<GarageSpot> _firestoreSpots = [];
-  DateTime? _lastFetch;
-  // Bookings  
-  final List<Booking> _bookings = [];
-
-  List<GarageSpot> get allSpots => [..._demoSpots, ..._firestoreSpots];
-  List<Booking> get bookings => List.unmodifiable(_bookings);
 
   // Fetch spots from Firestore (call this to refresh)
   Future<void> fetchSpotsFromFirestore() async {
     try {
       final snapshot = await _db.collection('spots').get();
-      _firestoreSpots = snapshot.docs.map((doc) => GarageSpot.fromFirestore(doc.id, doc.data())).toList();
+      _firestoreSpots = snapshot.docs
+          .map((doc) => GarageSpot.fromFirestore(doc.id, doc.data()))
+          .toList();
       _lastFetch = DateTime.now();
     } catch (e) {
       // Keep existing data on error
+      print('Error fetching spots: $e');
     }
   }
 
@@ -95,7 +80,7 @@ class ParkingService {
     // Check local first
     final local = getSpot(id);
     if (local != null) return local;
-    
+
     // Try Firestore
     final doc = await _db.collection('spots').doc(id).get();
     if (doc.exists) {
@@ -156,15 +141,17 @@ class ParkingService {
   Future<void> addReview(String spotId, Review review) async {
     // Add to Firestore
     await _db.collection('spots').doc(spotId).collection('reviews').add(review.toFirestore());
-    
+
     // Update spot rating
-    final reviewsSnapshot = await _db.collection('spots').doc(spotId).collection('reviews').get();
+    final reviewsSnapshot =
+        await _db.collection('spots').doc(spotId).collection('reviews').get();
+
     double totalRating = 0;
     for (var doc in reviewsSnapshot.docs) {
       totalRating += (doc.data()['rating'] as num).toDouble();
     }
     final newRating = totalRating / reviewsSnapshot.docs.length;
-    
+
     await _db.collection('spots').doc(spotId).update({
       'rating': newRating,
       'reviewsCount': reviewsSnapshot.docs.length,
@@ -194,19 +181,19 @@ class ParkingService {
 
   // === BOOKINGS ===
 
-  // === BOOKINGS ===
-
   Future<void> createBooking(Booking booking) async {
-    // Save to Firestore
     try {
       await _db.collection('bookings').doc(booking.id).set(booking.toFirestore());
-      
-      // Also update local list immediately for responsiveness (optional, since stream handles it)
-      // _bookings.add(booking); 
+      // Local list will update via stream listener in init()
     } catch (e) {
       print('Error creating booking: $e');
       rethrow;
     }
+  }
+
+  // ✅ Alias για παλιό call: ParkingService().addBooking(...)
+  Future<void> addBooking(Booking booking) async {
+    return createBooking(booking);
   }
 
   Future<void> cancelBooking(String bookingId) async {
@@ -223,10 +210,9 @@ class ParkingService {
   }
 
   Future<List<Booking>> getBookingsForUserAsync(String userId) async {
-    final snapshot = await _db.collection('bookings')
-        .where('userId', isEqualTo: userId)
-        .get();
-    
+    final snapshot =
+        await _db.collection('bookings').where('userId', isEqualTo: userId).get();
+
     List<Booking> bookings = [];
     for (var doc in snapshot.docs) {
       final data = doc.data();
@@ -240,18 +226,16 @@ class ParkingService {
 
   List<Booking> getActiveBookingsForUser(String userId) {
     final now = DateTime.now();
-    return _bookings.where((b) => 
-      b.userId == userId && 
-      b.active && 
-      b.endTime.isAfter(now)
-    ).toList();
+    return _bookings
+        .where((b) => b.userId == userId && b.active && b.endTime.isAfter(now))
+        .toList();
   }
 
   List<Booking> getBookingsForOwner(String ownerId) {
     final ownerSpotIds = allSpots
-      .where((s) => s.ownerId == ownerId)
-      .map((s) => s.id)
-      .toSet();
+        .where((s) => s.ownerId == ownerId)
+        .map((s) => s.id)
+        .toSet();
     return _bookings.where((b) => ownerSpotIds.contains(b.spot.id)).toList();
   }
 
@@ -259,7 +243,7 @@ class ParkingService {
 
   bool isSpotAvailable(String spotId, DateTime date) {
     final requestedEnd = date.add(const Duration(hours: 2));
-    
+
     for (var b in _bookings) {
       if (b.spot.id == spotId && b.active) {
         if (date.isBefore(b.endTime) && requestedEnd.isAfter(b.startTime)) {
@@ -267,14 +251,14 @@ class ParkingService {
         }
       }
     }
-    
+
     final seed = spotId.hashCode + date.day + date.hour;
     final rnd = Random(seed);
     return rnd.nextDouble() < 0.7;
   }
 
   // === DEMO DATA GENERATION ===
-  
+
   void _generateDemoSpots() {
     final rnd = Random(42);
     final areas = [
@@ -299,7 +283,7 @@ class ParkingService {
       for (var i = 0; i < count; i++) {
         final lat = area.center.latitude + (rnd.nextDouble() - 0.5) * 0.005;
         final lng = area.center.longitude + (rnd.nextDouble() - 0.5) * 0.005;
-        final price = 4.0 + rnd.nextInt(8).toDouble(); 
+        final price = 4.0 + rnd.nextInt(8).toDouble();
         final daily = price * (8 + rnd.nextInt(4));
 
         final featCount = 3 + rnd.nextInt(3);
@@ -421,7 +405,7 @@ class Review {
   final double rating;
   final String comment;
   final DateTime date;
-  
+
   Review({
     required this.userName,
     required this.rating,

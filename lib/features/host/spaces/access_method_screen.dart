@@ -15,12 +15,25 @@ class AccessMethodScreen extends StatefulWidget {
 class _AccessMethodScreenState extends State<AccessMethodScreen> {
   int selected = 0;
 
+  // Get access method string from selection
+  String get _accessMethod {
+    switch (selected) {
+      case 0: return 'pin';
+      case 1: return 'physical_key';
+      case 2: return 'card';
+      case 3: return 'in_person';
+      default: return 'pin';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.params['edit'] == 'true';
+    
     return Scaffold(
       appBar: AppBar(
         leading: const BackButton(),
-        title: const Text('Τρόπος Πρόσβασης'),
+        title: Text(isEditing ? 'Επεξεργασία Πρόσβασης' : 'Τρόπος Πρόσβασης'),
       ),
       body: SafeArea(
         child: Padding(
@@ -99,9 +112,17 @@ class _AccessMethodScreenState extends State<AccessMethodScreen> {
                          final lat = double.tryParse(widget.params['lat'] ?? '') ?? 37.9838;
                          final lng = double.tryParse(widget.params['lng'] ?? '') ?? 23.7275;
                          
-                         // Create Spot with unique ID
+                         // Use existing ID if editing, otherwise create new
+                         final spotId = isEditing 
+                             ? widget.params['id']! 
+                             : 'spot_${DateTime.now().millisecondsSinceEpoch}';
+                         
+                         // TASK 1 FIX: Preserve existing image if user didn't pick new one
+                         final existingImageUrl = widget.params['existingImageUrl'];
+                         
+                         // Create/Update Spot with preserved image and host photo
                          final spot = GarageSpot(
-                           id: 'spot_${DateTime.now().millisecondsSinceEpoch}',
+                           id: spotId,
                            title: title,
                            subtitle: addr,
                            area: 'Κέντρο',
@@ -112,12 +133,19 @@ class _AccessMethodScreenState extends State<AccessMethodScreen> {
                            reviewsCount: 0,
                            features: ['Covered', '24/7'],
                            ownerName: owner,
+                           ownerPhotoUrl: currentUser?.photoUrl, // TASK 5: Save host photo for display
                            reviews: [],
                            ownerId: currentUser?.id,
+                           accessMethod: _accessMethod,
+                           imageUrl: existingImageUrl, // Preserve existing image
                          );
                          
-                         // Save to Firestore
-                         await ParkingService().addSpot(spot);
+                         // Save to Firestore - UPDATE if editing, ADD if new
+                         if (isEditing) {
+                           await ParkingService().updateSpot(spot);
+                         } else {
+                           await ParkingService().addSpot(spot);
+                         }
                          
                          // Navigate to Success
                          if (context.mounted) {
@@ -125,11 +153,12 @@ class _AccessMethodScreenState extends State<AccessMethodScreen> {
                              'title': title,
                              'price': widget.params['price'] ?? '5',
                              'addr': addr,
+                             'edit': isEditing ? 'true' : 'false',
                            }).toString());
                          }
                       },
                       style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                      child: const Text('Δημοσίευση'),
+                      child: Text(isEditing ? 'Αποθήκευση' : 'Δημοσίευση'),
                     ),
                   ),
                 ],

@@ -83,16 +83,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 itemCount: messages.length,
                 itemBuilder: (_, i) {
                   final m = messages[i];
-                  // Determine if 'me' based on senderId
-                  // If senderId == myId => me. 
-                  // If senderId == 'host' => other (unless I am host, but simplifiction: I am always 'me')
-                  // Logic: if m.senderId != 'host' => it was sent by user. 
-                  // If current user is host, they should see 'host' messages as 'me'?
-                  // Let's assume current view is USER view.
-                  // User = me, Host = other.
-                  // If m.senderId != 'host' -> me.
-                  
-                  final isMe = m.senderId != 'host';
+                  // FIX: Determine if 'me' based on comparing senderId to current user's ID
+                  // This works correctly for both host and driver views
+                  final isMe = m.senderId == myId;
+                  final isSystem = m.senderId == 'system';
                   final timeStr = DateFormat('HH:mm').format(m.timestamp);
 
                   return Align(

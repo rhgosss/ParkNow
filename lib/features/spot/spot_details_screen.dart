@@ -131,10 +131,22 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Owner Info
+          // Owner Info with Host Avatar (TASK 5)
           Row(
             children: [
-              const CircleAvatar(backgroundColor: Color(0xFFE5E7EB), child: Icon(Icons.person, color: Colors.grey)),
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: const Color(0xFFE5E7EB),
+                backgroundImage: s.ownerPhotoUrl != null && s.ownerPhotoUrl!.isNotEmpty
+                    ? NetworkImage(s.ownerPhotoUrl!)
+                    : null,
+                child: s.ownerPhotoUrl == null || s.ownerPhotoUrl!.isEmpty
+                    ? Text(
+                        s.ownerName.isNotEmpty ? s.ownerName[0].toUpperCase() : '?',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                      )
+                    : null,
+              ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

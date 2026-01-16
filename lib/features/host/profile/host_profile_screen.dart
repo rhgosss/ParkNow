@@ -1,21 +1,21 @@
-import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/state/app_state_scope.dart';
-import '../../core/data/parking_service.dart';
-import '../../core/data/auth_repository.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/state/app_state_scope.dart';
+import '../../../core/data/parking_service.dart';
+import '../../../core/data/auth_repository.dart';
 
-class ProfileTab extends StatefulWidget {
-  const ProfileTab({super.key});
+/// Host Profile Screen - mirrors User profile but for Host mode
+class HostProfileScreen extends StatefulWidget {
+  const HostProfileScreen({super.key});
 
   @override
-  State<ProfileTab> createState() => _ProfileTabState();
+  State<HostProfileScreen> createState() => _HostProfileScreenState();
 }
 
-class _ProfileTabState extends State<ProfileTab> {
+class _HostProfileScreenState extends State<HostProfileScreen> {
   final ImagePicker _picker = ImagePicker();
   bool _uploading = false;
 
@@ -32,13 +32,11 @@ class _ProfileTabState extends State<ProfileTab> {
     setState(() => _uploading = true);
 
     try {
-      // Read image bytes and convert to base64 data URL
       final bytes = await image.readAsBytes();
       final base64Image = base64Encode(bytes);
       final mimeType = image.mimeType ?? 'image/jpeg';
       final dataUrl = 'data:$mimeType;base64,$base64Image';
       
-      // Update profile photo
       await AuthRepository().updateProfilePhoto(dataUrl);
       
       if (mounted) {
@@ -64,21 +62,19 @@ class _ProfileTabState extends State<ProfileTab> {
     
     if (currentUser == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Προφίλ')),
+        appBar: AppBar(title: const Text('Προφίλ Host')),
         body: const Center(child: Text('Πρέπει να συνδεθείτε')),
       );
     }
 
-    final bookingCount = ParkingService().getBookingsForUser(currentUser.id).length;
+    // Get host-specific stats
+    final mySpots = ParkingService().getSpotsForOwner(currentUser.id);
     final initials = currentUser.name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join().toUpperCase();
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => context.go('/main'), 
-          icon: const Icon(Icons.arrow_back),
-        ),
-        title: const Text('Προφίλ'),
+        automaticallyImplyLeading: false,
+        title: const Text('Προφίλ Host'),
         actions: [
           TextButton(
             onPressed: () {
@@ -109,7 +105,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       children: [
                         CircleAvatar(
                           radius: 40,
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: const Color(0xFFE31C5F),
                           backgroundImage: currentUser.photoUrl != null && currentUser.photoUrl!.isNotEmpty
                               ? (currentUser.photoUrl!.startsWith('data:')
                                   ? MemoryImage(base64Decode(currentUser.photoUrl!.split(',').last))
@@ -125,7 +121,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: AppColors.primary,
+                              color: const Color(0xFFE31C5F),
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                             ),
@@ -153,19 +149,15 @@ class _ProfileTabState extends State<ProfileTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: currentUser.role == UserRole.host 
-                          ? const Color(0xFFE31C5F).withOpacity(0.1)
-                          : AppColors.primary.withOpacity(0.1),
+                      color: const Color(0xFFE31C5F).withAlpha(25),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      currentUser.role == UserRole.host ? 'Host Mode' : 'Driver Mode',
+                    child: const Text(
+                      'Host Mode',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: currentUser.role == UserRole.host 
-                            ? const Color(0xFFE31C5F)
-                            : AppColors.primary,
+                        color: Color(0xFFE31C5F),
                       ),
                     ),
                   ),
@@ -173,9 +165,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _StatItem(bookingCount.toString(), 'Κρατήσεις'),
+                      _StatItem(mySpots.length.toString(), 'Χώροι'),
                       const SizedBox(width: 30),
-                      const _StatItem('5', 'Αξιολογήσεις'),
+                      const _StatItem('5.0', 'Βαθμολογία'),
                     ],
                   ),
                 ],
@@ -190,30 +182,18 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
             const SizedBox(height: 10),
             _menuTile(
-              icon: Icons.calendar_month_outlined, 
-              text: 'Οι Κρατήσεις μου', 
-              onTap: () => context.push('/my-bookings'),
-            ),
-            const SizedBox(height: 10),
-            _menuTile(
-              icon: Icons.favorite_border, 
-              text: 'Αγαπημένα', 
-              onTap: () => context.push('/favorites'),
-            ),
-            const SizedBox(height: 10),
-            _menuTile(
               icon: Icons.payments_outlined, 
-              text: 'Πληρωμές', 
+              text: 'Πληρωμές & Έσοδα', 
               onTap: () => context.push('/payments'),
             ),
             const SizedBox(height: 10),
             _menuTile(
               icon: Icons.swap_horiz, 
-              text: currentUser.role == UserRole.driver ? 'Λειτουργία Host' : 'Λειτουργία Driver', 
-              onTap: () async {
+              text: 'Λειτουργία Driver', 
+              onTap: () {
                 AppStateScope.of(context).switchRole();
                 ScaffoldMessenger.of(context).showSnackBar(
-                   SnackBar(content: Text('Η λειτουργία άλλαξε σε ${currentUser.role == UserRole.driver ? "Host" : "Driver"}')),
+                   const SnackBar(content: Text('Η λειτουργία άλλαξε σε Driver')),
                 );
               },
             ),
@@ -264,7 +244,7 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(number, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 16)),
+        Text(number, style: const TextStyle(color: Color(0xFFE31C5F), fontWeight: FontWeight.w800, fontSize: 16)),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(color: AppColors.mutedText)),
       ],

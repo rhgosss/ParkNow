@@ -30,16 +30,31 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
   Uint8List? _selectedImageBytes; // For web compatibility
   final ImagePicker _picker = ImagePicker();
 
+  String? _editSpotId; // Track if we're editing
+  String? _existingImageUrl; // Preserve existing image during edit
+  String? _existingAccessMethod; // Preserve existing access method
+
   @override
   void initState() {
     super.initState();
     // Pre-fill if editing
     if (widget.queryParams != null && widget.queryParams!['edit'] == 'true') {
+       _editSpotId = widget.queryParams!['id'];
        titleCtrl.text = widget.queryParams!['title'] ?? '';
        addressCtrl.text = widget.queryParams!['addr'] ?? '';
        priceCtrl.text = widget.queryParams!['price'] ?? '';
-       // Simulate location (would ideally pass lat/lng too or geocode address)
-       _hasSelectedLocation = true; 
+       
+       // Load existing image URL - will be preserved if user doesn't pick new one
+       _existingImageUrl = widget.queryParams!['imageUrl'];
+       _existingAccessMethod = widget.queryParams!['accessMethod'];
+       
+       // Load lat/lng from params
+       final lat = double.tryParse(widget.queryParams!['lat'] ?? '');
+       final lng = double.tryParse(widget.queryParams!['lng'] ?? '');
+       if (lat != null && lng != null) {
+         _selectedPos = LatLng(lat, lng);
+         _hasSelectedLocation = true;
+       }
     }
   }
 
@@ -84,6 +99,28 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
     }
   }
 
+  // Reverse geocode: get address from coordinates
+  Future<void> _reverseGeocode(LatLng pos) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        final address = [
+          place.street,
+          place.locality,
+          place.administrativeArea,
+        ].where((s) => s != null && s.isNotEmpty).join(', ');
+        
+        if (address.isNotEmpty) {
+          addressCtrl.text = address;
+        }
+      }
+    } catch (e) {
+      // Fallback: just show coordinates
+      addressCtrl.text = 'Lat: ${pos.latitude.toStringAsFixed(4)}, Lng: ${pos.longitude.toStringAsFixed(4)}';
+    }
+  }
+
   Future<void> _pickLocation() async {
     final result = await showDialog<LatLng>(
       context: context,
@@ -94,11 +131,10 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
       setState(() {
         _selectedPos = result;
         _hasSelectedLocation = true;
-        // Optional: Reverse geocode to get address text if empty
-        if (addressCtrl.text.isEmpty) {
-           addressCtrl.text = 'Selected Location (${result.latitude.toStringAsFixed(3)}, ${result.longitude.toStringAsFixed(3)})';
-        }
       });
+      
+      // Bi-directional sync: update address from map pin
+      await _reverseGeocode(result);
     }
   }
 
@@ -215,7 +251,7 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
 
             const SizedBox(height: 18),
             PrimaryButton(
-              text: 'Next Step',
+              text: _editSpotId != null ? 'Αποθήκευση Αλλαγών' : 'Next Step',
               onPressed: () {
                 context.push(Uri(path: '/host/access', queryParameters: {
                   'title': titleCtrl.text,
@@ -224,7 +260,11 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
                   'desc': descCtrl.text,
                   'lat': _selectedPos.latitude.toString(),
                   'lng': _selectedPos.longitude.toString(),
-                  // 'imagePath': _selectedImage?.path, // Would need to handle path/upload in next steps
+                  if (_editSpotId != null) 'edit': 'true',
+                  if (_editSpotId != null) 'id': _editSpotId!,
+                  // Preserve existing image if user didn't pick a new one
+                  if (_existingImageUrl != null) 'existingImageUrl': _existingImageUrl!,
+                  if (_existingAccessMethod != null) 'existingAccessMethod': _existingAccessMethod!,
                 }).toString());
               },
             ),

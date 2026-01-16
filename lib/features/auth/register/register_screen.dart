@@ -23,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   
   bool _isLoading = false;
   String? _errorMessage;
+  bool _autoValidate = false; // Enable validation after first submit attempt
 
   @override
   void dispose() {
@@ -35,52 +36,56 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  // Real-time validators for TextFormField
+  String? _validateName(String? value) {
+    if (value == null || value.isEmpty) return 'Το όνομα είναι υποχρεωτικό';
+    if (value.length < 2) return 'Το όνομα πρέπει να έχει τουλάχιστον 2 χαρακτήρες';
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) return 'Το email είναι υποχρεωτικό';
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value)) return 'Μη έγκυρη μορφή email';
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.isEmpty) return 'Το τηλέφωνο είναι υποχρεωτικό';
+    if (value.length < 10) return 'Μη έγκυρος αριθμός τηλεφώνου';
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Ο κωδικός είναι υποχρεωτικός';
+    if (value.length < 6) return 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες';
+    return null;
+  }
+
+  String? _validatePasswordMatch(String? value) {
+    if (value == null || value.isEmpty) return 'Επιβεβαιώστε τον κωδικό';
+    if (value != passController.text) return 'Οι κωδικοί δεν ταιριάζουν';
+    return null;
+  }
+
   Future<void> _validateAndProceed() async {
+    // Enable auto-validation after first attempt
+    setState(() => _autoValidate = true);
+    
     // Clear previous error
     setState(() => _errorMessage = null);
 
-    // Validate all fields
+    // Validate form using TextFormField validators
+    if (!_formKey.currentState!.validate()) {
+      return; // Stop if validation fails
+    }
+
     final fullName = '${nameController.text.trim()} ${lastNameController.text.trim()}'.trim();
     final email = emailController.text.trim();
     final phone = phoneController.text.trim();
     final password = passController.text;
-    final password2 = pass2Controller.text;
 
-    // Name validation
-    final nameError = AuthRepository.validateName(fullName);
-    if (nameError != null) {
-      setState(() => _errorMessage = nameError);
-      return;
-    }
-
-    // Email validation
-    final emailError = AuthRepository.validateEmail(email);
-    if (emailError != null) {
-      setState(() => _errorMessage = emailError);
-      return;
-    }
-
-    // Phone validation
-    final phoneError = AuthRepository.validatePhone(phone);
-    if (phoneError != null) {
-      setState(() => _errorMessage = phoneError);
-      return;
-    }
-
-    // Password validation
-    final passError = AuthRepository.validatePassword(password);
-    if (passError != null) {
-      setState(() => _errorMessage = passError);
-      return;
-    }
-
-    // Password match
-    if (password != password2) {
-      setState(() => _errorMessage = 'Οι κωδικοί δεν ταιριάζουν');
-      return;
-    }
-
-    // Check if email already exists
+    // TASK 2: Check if email already exists BEFORE navigating
     setState(() => _isLoading = true);
     try {
       final exists = await AuthRepository().emailExists(email);
@@ -92,7 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
     } catch (e) {
-      // Continue if check fails
+      // Continue if check fails (might be network issue)
     }
     setState(() => _isLoading = false);
 
@@ -114,10 +119,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: Form(
           key: _formKey,
+          autovalidateMode: _autoValidate 
+              ? AutovalidateMode.onUserInteraction 
+              : AutovalidateMode.disabled,
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Error message
+              // Error message (for duplicate email)
               if (_errorMessage != null)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -141,44 +149,127 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
 
-              AppTextField(
-                label: 'Όνομα *',
-                hint: 'Γιώργος',
+              // Name field with real-time validation
+              TextFormField(
                 controller: nameController,
+                validator: _validateName,
+                decoration: InputDecoration(
+                  labelText: 'Όνομα *',
+                  hintText: 'Γιώργος',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
-              AppTextField(
-                label: 'Επώνυμο *',
-                hint: 'Παπαδόπουλος',
+
+              // Last Name field
+              TextFormField(
                 controller: lastNameController,
+                validator: _validateName,
+                decoration: InputDecoration(
+                  labelText: 'Επώνυμο *',
+                  hintText: 'Παπαδόπουλος',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
-              AppTextField(
-                label: 'Email *',
-                hint: 'email@example.com',
+
+              // Email field with real-time validation
+              TextFormField(
                 controller: emailController,
+                validator: _validateEmail,
                 keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: 'Email *',
+                  hintText: 'email@example.com',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
-              AppTextField(
-                label: 'Τηλέφωνο *',
-                hint: '69X XXX XXXX',
+
+              // Phone field
+              TextFormField(
                 controller: phoneController,
+                validator: _validatePhone,
                 keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Τηλέφωνο *',
+                  hintText: '69X XXX XXXX',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
-              AppTextField(
-                label: 'Κωδικός * (min 6 χαρακτήρες)',
-                hint: '••••••••',
+
+              // Password field with real-time validation
+              TextFormField(
                 controller: passController,
+                validator: _validatePassword,
                 obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Κωδικός * (min 6 χαρακτήρες)',
+                  hintText: '••••••••',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
-              AppTextField(
-                label: 'Επιβεβαίωση Κωδικού *',
-                hint: '••••••••',
+
+              // Confirm Password field
+              TextFormField(
                 controller: pass2Controller,
+                validator: _validatePasswordMatch,
                 obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Επιβεβαίωση Κωδικού *',
+                  hintText: '••••••••',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 2),
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
 

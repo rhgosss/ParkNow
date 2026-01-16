@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'spaces/host_spaces_screen.dart';
 import 'messages/host_messages_screen.dart';
 import 'stats/host_stats_screen.dart';
-import 'settings/host_settings_screen.dart';
+import 'profile/host_profile_screen.dart';
 
 class HostShell extends StatefulWidget {
   const HostShell({super.key});
@@ -18,7 +18,7 @@ class _HostShellState extends State<HostShell> {
     HostSpacesScreen(),
     HostMessagesScreen(),
     HostStatsScreen(),
-    HostSettingsScreen(),
+    HostProfileScreen(), // TASK 1: Replaced Settings with Profile
   ];
 
   @override
@@ -33,7 +33,7 @@ class _HostShellState extends State<HostShell> {
           BottomNavigationBarItem(icon: Icon(Icons.location_on_outlined), label: 'Χώροι'),
           BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Μηνύματα'),
           BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: 'Stats'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Settings'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Προφίλ'), // Changed icon and label
         ],
       ),
     );

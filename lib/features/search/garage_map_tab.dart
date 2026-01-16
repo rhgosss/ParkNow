@@ -20,12 +20,23 @@ class _GarageMapTabState extends State<GarageMapTab> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = AppStateScope.of(context).currentUser;
+    
     return StreamBuilder<List<GarageSpot>>(
       stream: ParkingService().spotsStream,
       initialData: ParkingService().allSpots,
       builder: (context, snapshot) {
-        final spots = snapshot.data ?? [];
-        final markers = spots.map((s) => _toMarker(s)).toSet();
+        final allSpots = snapshot.data ?? [];
+        
+        // Filter: visible spots, exclude own spots in driver mode (conflict prevention)
+        final visibleSpots = allSpots.where((s) {
+          if (!s.isVisible) return false;
+          // Host can't see/book their own spots when in user mode
+          if (currentUser != null && s.ownerId == currentUser.id) return false;
+          return true;
+        }).toList();
+        
+        final markers = visibleSpots.map((s) => _toMarker(s)).toSet();
 
         return Scaffold(
           body: Stack(
@@ -159,6 +170,7 @@ class _GarageMapTabState extends State<GarageMapTab> {
                   padding: const EdgeInsets.all(12),
                   child: _SpotCard(
                     spot: _selected!,
+                    isBooked: ParkingService().isSpotCurrentlyBooked(_selected!.id),
                     onClose: () => setState(() => _selected = null),
                     onBook: () => context.push('/spot/${_selected!.id}'),
                     onToggleFavorite: () {
@@ -199,12 +211,15 @@ class _GarageMapTabState extends State<GarageMapTab> {
         (d.hour - now.hour).abs() < 1;
   }
 
-  // ΟΛΑ ΠΡΑΣΙΝΑ PINS
+  // Dynamic marker colors: GREEN for available, RED for booked
   Marker _toMarker(GarageSpot s) {
+    final isBooked = ParkingService().isSpotCurrentlyBooked(s.id);
     return Marker(
       markerId: MarkerId(s.id),
       position: s.pos,
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      icon: BitmapDescriptor.defaultMarkerWithHue(
+        isBooked ? BitmapDescriptor.hueRed : BitmapDescriptor.hueGreen
+      ),
       onTap: () => setState(() => _selected = s),
     );
   }
@@ -274,6 +289,7 @@ class _RoundIconButton extends StatelessWidget {
 
 class _SpotCard extends StatelessWidget {
   final GarageSpot spot;
+  final bool isBooked;
   final VoidCallback onClose;
   final VoidCallback onBook;
   final VoidCallback onNavigate;
@@ -282,6 +298,7 @@ class _SpotCard extends StatelessWidget {
 
   const _SpotCard({
     required this.spot,
+    required this.isBooked,
     required this.onClose,
     required this.onBook,
     required this.onNavigate,
@@ -302,6 +319,19 @@ class _SpotCard extends StatelessWidget {
           children: [
             Row(
               children: [
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isBooked ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isBooked ? 'BOOKED' : 'FREE',
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     spot.title,
@@ -349,8 +379,11 @@ class _SpotCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: onBook,
-                    child: const Text('Κράτηση'),
+                    onPressed: isBooked ? null : onBook,
+                    style: isBooked ? ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade300,
+                    ) : null,
+                    child: Text(isBooked ? 'Κατειλημμένο' : 'Κράτηση'),
                   ),
                 ),
               ],
@@ -361,3 +394,4 @@ class _SpotCard extends StatelessWidget {
     );
   }
 }
+

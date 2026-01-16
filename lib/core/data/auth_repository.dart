@@ -298,6 +298,7 @@ class AuthRepository extends ChangeNotifier {
       email: _currentUser!.email,
       name: newName,
       phone: _currentUser!.phone,
+      photoUrl: _currentUser!.photoUrl,
       role: _currentUser!.role,
       createdAt: _currentUser!.createdAt,
       totalIncome: _currentUser!.totalIncome,
@@ -310,6 +311,30 @@ class AuthRepository extends ChangeNotifier {
     
     notifyListeners();
   }
+
+  // Update user profile photo (persists across role switches)
+  Future<void> updateProfilePhoto(String photoUrl) async {
+    if (_currentUser == null) return;
+    
+    _currentUser = AppUser(
+      id: _currentUser!.id,
+      email: _currentUser!.email,
+      name: _currentUser!.name,
+      phone: _currentUser!.phone,
+      photoUrl: photoUrl,
+      role: _currentUser!.role,
+      createdAt: _currentUser!.createdAt,
+      totalIncome: _currentUser!.totalIncome,
+      ownedSpotIds: _currentUser!.ownedSpotIds,
+      bookingIds: _currentUser!.bookingIds,
+      favoriteSpotIds: _currentUser!.favoriteSpotIds,
+    );
+    
+    await _db.collection('users').doc(_currentUser!.id).update({'photoUrl': photoUrl});
+    
+    notifyListeners();
+  }
+
 
   // Handle Firebase Auth errors with Greek messages
   Exception _handleAuthError(FirebaseAuthException e) {

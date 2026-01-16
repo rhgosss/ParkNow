@@ -14,6 +14,7 @@ import '../features/host/spaces/new_space_success_screen.dart';
 import '../features/host/messages/host_messages_screen.dart';
 
 import '../features/chat/chat_screen.dart';
+import '../features/chat/user_messages_screen.dart';
 import '../features/favorites/favorites_screen.dart';
 import '../features/profile/edit_profile_screen.dart';
 import '../features/payments/payments_screen.dart';
@@ -131,6 +132,7 @@ GoRoute(
       GoRoute(path: '/edit-profile', builder: (_, __) => const EditProfileScreen()),
       GoRoute(path: '/payments', builder: (_, __) => const PaymentsScreen()),
       GoRoute(path: '/messages', builder: (_, __) => const HostMessagesScreen()),
+      GoRoute(path: '/user-messages', builder: (_, __) => const UserMessagesScreen()),
     ],
   );
 }

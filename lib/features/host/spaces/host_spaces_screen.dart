@@ -119,14 +119,26 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
                         spot: spot,
                         isBooked: isBooked,
                         onStats: () => context.push('/main'), 
-                        // Link Edit Button
+                        // Link Edit Button - pass all existing data including imageUrl
                         onEdit: () => context.push(Uri(path: '/host/new-space', queryParameters: {
                           'edit': 'true',
                           'id': spot.id,
                           'title': spot.title,
                           'addr': spot.subtitle,
                           'price': spot.pricePerHour.toString(),
+                          'lat': spot.pos.latitude.toString(),
+                          'lng': spot.pos.longitude.toString(),
+                          if (spot.imageUrl != null) 'imageUrl': spot.imageUrl!,
+                          'accessMethod': spot.accessMethod,
                         }).toString()),
+                        onToggleVisibility: () async {
+                          await ParkingService().toggleSpotVisibility(spot.id);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(spot.isVisible ? 'Ο χώρος κρύφτηκε' : 'Ο χώρος είναι πλέον εμφανής')),
+                            );
+                          }
+                        },
                         onDelete: () async {
                           final confirm = await showDialog<bool>(
                             context: context,
@@ -193,71 +205,111 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
     required VoidCallback onStats,
     required VoidCallback onEdit,
     required VoidCallback onDelete,
+    required VoidCallback onToggleVisibility,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image Area
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Container(
-                  height: 180,
-                  width: double.infinity,
-                  color: Colors.grey.shade200,
-                  // Placeholder for real image
-                  child: spot.imageUrl != null 
-                      ? Image.network(spot.imageUrl!, fit: BoxFit.cover)
-                      : const Center(child: Icon(Icons.image_outlined, size: 64, color: Colors.black12)),
-                ),
-              ),
-              // Status Badge - BOOKED or FREE
-              Positioned(
-                top: 12,
-                left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isBooked ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    isBooked ? 'BOOKED' : 'FREE', 
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white),
+    return Opacity(
+      opacity: spot.isVisible ? 1.0 : 0.6, // Dim hidden spots
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Area
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Container(
+                    height: 180,
+                    width: double.infinity,
+                    color: Colors.grey.shade200,
+                    // Placeholder for real image
+                    child: spot.imageUrl != null 
+                        ? Image.network(spot.imageUrl!, fit: BoxFit.cover)
+                        : const Center(child: Icon(Icons.image_outlined, size: 64, color: Colors.black12)),
                   ),
                 ),
-              ),
-              // Delete button (top right)
-              Positioned(
-                top: 12,
-                right: 12,
-                child: CircleAvatar(
-                  backgroundColor: Colors.white.withOpacity(0.9),
-                  radius: 16,
-                  child: IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    onPressed: onDelete,
-                    color: Colors.red,
-                    padding: EdgeInsets.zero,
+                // Status Badge - BOOKED, FREE, or HIDDEN
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isBooked ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isBooked ? 'BOOKED' : 'FREE', 
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white),
+                        ),
+                      ),
+                      if (!spot.isVisible) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade700,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'HIDDEN', 
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-          
+                // Hide/Unhide button (top right, next to delete)
+                Positioned(
+                  top: 12,
+                  right: 48,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white.withOpacity(0.9),
+                    radius: 16,
+                    child: IconButton(
+                      icon: Icon(
+                        spot.isVisible ? Icons.visibility : Icons.visibility_off,
+                        size: 18,
+                      ),
+                      onPressed: onToggleVisibility,
+                      color: spot.isVisible ? Colors.blue : Colors.grey,
+                      padding: EdgeInsets.zero,
+                      tooltip: spot.isVisible ? 'Απόκρυψη' : 'Εμφάνιση',
+                    ),
+                  ),
+                ),
+                // Delete button (top right)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white.withOpacity(0.9),
+                    radius: 16,
+                    child: IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      onPressed: onDelete,
+                      color: Colors.red,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
           // Info Area
           Padding(
             padding: const EdgeInsets.all(16),
@@ -326,7 +378,8 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
           ),
         ],
       ),
-    );
+    ),  // Close Container
+    );  // Close Opacity
   }
 }
 

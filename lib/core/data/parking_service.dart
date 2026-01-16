@@ -132,18 +132,42 @@ class ParkingService {
 
   // === SPOTS MANAGEMENT ===
 
-  // Add spot to Firestore
+  // Add spot to Firestore (stream listener will update local list)
   Future<void> addSpot(GarageSpot spot) async {
     await _db.collection('spots').doc(spot.id).set(spot.toFirestore());
-    _firestoreSpots.insert(0, spot);
-    _emitSpots();
+    // TASK 1 FIX: Don't manually add to list - stream listener handles it
+    // This prevents duplicates
+  }
+
+  // Update existing spot in Firestore (for edit flow - no duplicates)
+  Future<void> updateSpot(GarageSpot spot) async {
+    await _db.collection('spots').doc(spot.id).update(spot.toFirestore());
+    // TASK 1 FIX: Don't manually update list - stream listener handles it
+  }
+
+  // Toggle spot visibility (hide/unhide without deleting)
+  Future<void> toggleSpotVisibility(String spotId) async {
+    final spot = getSpot(spotId);
+    if (spot == null) return;
+    final newVisibility = !(spot.isVisible);
+    await _db.collection('spots').doc(spotId).update({'isVisible': newVisibility});
+    // Stream listener handles local update
   }
 
   // Delete spot from Firestore
   Future<void> deleteSpot(String spotId) async {
     await _db.collection('spots').doc(spotId).delete();
-    _firestoreSpots.removeWhere((s) => s.id == spotId);
-    _emitSpots();
+    // TASK 1 FIX: Don't manually remove from list - stream listener handles it
+  }
+
+  // Get visible spots only (for user/driver view)
+  List<GarageSpot> getVisibleSpots() {
+    return allSpots.where((s) => s.isVisible).toList();
+  }
+
+  // Get spots excluding a specific owner (for conflict prevention - host can't book own spots)
+  List<GarageSpot> getSpotsExcludingOwner(String ownerId) {
+    return allSpots.where((s) => s.ownerId != ownerId && s.isVisible).toList();
   }
 
   // Check if spot is currently booked (has active booking right now)
@@ -375,9 +399,13 @@ class GarageSpot {
   final int reviewsCount;
   final List<String> features;
   final String ownerName;
+  final String? ownerPhotoUrl; // TASK 5: Host profile photo for spot details
   final List<Review> reviews;
   final String? ownerId;
   final String? imageUrl;
+  final bool isVisible;      // For hide/unhide functionality
+  final String accessMethod; // 'pin' or 'in_person'
+  final String? accessPin;   // PIN code if accessMethod == 'pin'
 
   GarageSpot({
     required this.id,
@@ -391,10 +419,57 @@ class GarageSpot {
     required this.reviewsCount,
     required this.features,
     required this.ownerName,
+    this.ownerPhotoUrl,
     required this.reviews,
     this.ownerId,
     this.imageUrl,
+    this.isVisible = true,
+    this.accessMethod = 'pin',
+    this.accessPin,
   });
+
+  // Create a copy with updated fields
+  GarageSpot copyWith({
+    String? id,
+    String? title,
+    String? subtitle,
+    String? area,
+    double? pricePerHour,
+    double? pricePerDay,
+    LatLng? pos,
+    double? rating,
+    int? reviewsCount,
+    List<String>? features,
+    String? ownerName,
+    List<Review>? reviews,
+    String? ownerId,
+    String? imageUrl,
+    String? ownerPhotoUrl,
+    bool? isVisible,
+    String? accessMethod,
+    String? accessPin,
+  }) {
+    return GarageSpot(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      area: area ?? this.area,
+      pricePerHour: pricePerHour ?? this.pricePerHour,
+      pricePerDay: pricePerDay ?? this.pricePerDay,
+      pos: pos ?? this.pos,
+      rating: rating ?? this.rating,
+      reviewsCount: reviewsCount ?? this.reviewsCount,
+      features: features ?? this.features,
+      ownerName: ownerName ?? this.ownerName,
+      ownerPhotoUrl: ownerPhotoUrl ?? this.ownerPhotoUrl,
+      reviews: reviews ?? this.reviews,
+      ownerId: ownerId ?? this.ownerId,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isVisible: isVisible ?? this.isVisible,
+      accessMethod: accessMethod ?? this.accessMethod,
+      accessPin: accessPin ?? this.accessPin,
+    );
+  }
 
   Map<String, dynamic> toFirestore() {
     return {
@@ -409,8 +484,12 @@ class GarageSpot {
       'reviewsCount': reviewsCount,
       'features': features,
       'ownerName': ownerName,
+      'ownerPhotoUrl': ownerPhotoUrl,
       'ownerId': ownerId,
       'imageUrl': imageUrl,
+      'isVisible': isVisible,
+      'accessMethod': accessMethod,
+      'accessPin': accessPin,
     };
   }
 
@@ -430,9 +509,13 @@ class GarageSpot {
       reviewsCount: (data['reviewsCount'] as num?)?.toInt() ?? 0,
       features: List<String>.from(data['features'] ?? []),
       ownerName: data['ownerName'] ?? '',
+      ownerPhotoUrl: data['ownerPhotoUrl'],
       reviews: [], // Reviews loaded separately
       ownerId: data['ownerId'],
       imageUrl: data['imageUrl'],
+      isVisible: data['isVisible'] ?? true,
+      accessMethod: data['accessMethod'] ?? 'pin',
+      accessPin: data['accessPin'],
     );
   }
 }

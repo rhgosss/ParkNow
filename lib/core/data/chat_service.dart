@@ -92,19 +92,30 @@ class ChatService extends ChangeNotifier {
     );
     
     await _db.collection('messages').add(msg.toFirestore());
+    
+    // TASK 2 FIX: Update lastMessageAt so conversation appears at top of list
+    // and is visible to both parties
+    await _db.collection('conversations').doc(conversationId).update({
+      'lastMessageAt': Timestamp.now(),
+    }).catchError((_) {
+      // Ignore if conversation doc doesn't exist yet
+    });
   }
 
   // Create a conversation when booking is made
+  // TASK 2: Each conversation is tied to a specific parking spot (spotId)
   Future<String> createConversationForBooking({
     required String driverId,
     required String driverName,
     required String hostId,
     required String hostName,
+    required String spotId, // TASK 2: Per-parking messaging
     required String spotTitle,
     required String bookingId,
   }) async {
-    // Convention: conversationId = "driverId_hostId_bookingId"
-    final conversationId = '${driverId}_${hostId}_$bookingId';
+    // TASK 2: Convention: conversationId = "driverId_hostId_spotId_bookingId"
+    // This ensures each parking spot has its own chat thread
+    final conversationId = '${driverId}_${hostId}_${spotId}_$bookingId';
     
     // Send initial system message
     final initialMsg = ChatMessage(
@@ -118,12 +129,13 @@ class ChatService extends ChangeNotifier {
     
     await _db.collection('messages').add(initialMsg.toFirestore());
     
-    // Also store conversation metadata for easy lookup
+    // Store conversation metadata for easy lookup (TASK 2: includes spotId)
     await _db.collection('conversations').doc(conversationId).set({
       'driverId': driverId,
       'driverName': driverName,
       'hostId': hostId,
       'hostName': hostName,
+      'spotId': spotId, // TASK 2: Store spotId for per-parking filtering
       'spotTitle': spotTitle,
       'bookingId': bookingId,
       'createdAt': Timestamp.now(),
@@ -147,5 +159,113 @@ class ChatService extends ChangeNotifier {
     
     final all = [...asDriver.docs, ...asHost.docs];
     return all.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+  }
+
+  // Get conversations where user is HOST only (for host mode messages view)
+  Future<List<Map<String, dynamic>>> getConversationsForHost(String userId) async {
+    try {
+      // TASK 3 FIX: Removed orderBy to avoid composite index requirement
+      final asHost = await _db.collection('conversations')
+          .where('hostId', isEqualTo: userId)
+          .get();
+      
+      final results = asHost.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      
+      // Sort in memory instead of in query to avoid index issues
+      results.sort((a, b) {
+        final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        return bTime.compareTo(aTime); // Descending
+      });
+      
+      return results;
+    } catch (e) {
+      debugPrint('Error fetching host conversations: $e');
+      return [];
+    }
+  }
+
+  // Get conversations where user is DRIVER only (for user mode messages view)
+  Future<List<Map<String, dynamic>>> getConversationsForDriver(String userId) async {
+    try {
+      // TASK 3 FIX: Removed orderBy to avoid composite index requirement
+      final asDriver = await _db.collection('conversations')
+          .where('driverId', isEqualTo: userId)
+          .get();
+      
+      final results = asDriver.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      
+      // Sort in memory instead of in query to avoid index issues
+      results.sort((a, b) {
+        final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        return bTime.compareTo(aTime); // Descending
+      });
+      
+      return results;
+    } catch (e) {
+      debugPrint('Error fetching driver conversations: $e');
+      return [];
+    }
+  }
+
+  // Check if this is the first user message in a conversation (for auto-reply trigger)
+  Future<bool> isFirstUserMessage(String conversationId, String driverId) async {
+    final messages = await _db.collection('messages')
+        .where('conversationId', isEqualTo: conversationId)
+        .where('senderId', isEqualTo: driverId)
+        .limit(1)
+        .get();
+    
+    return messages.docs.isEmpty;
+  }
+
+  // Send automated reply from host
+  Future<void> sendAutoReply(String conversationId, String hostId, String hostName) async {
+    final autoReply = ChatMessage(
+      id: '',
+      text: 'Ευχαριστώ για το ενδιαφέρον σας! Θα απαντήσω σύντομα. 🅿️',
+      senderId: hostId,
+      senderName: hostName,
+      conversationId: conversationId,
+      timestamp: DateTime.now(),
+    );
+    
+    await _db.collection('messages').add(autoReply.toFirestore());
+    
+    // Update last message timestamp
+    await _db.collection('conversations').doc(conversationId).update({
+      'lastMessageAt': Timestamp.now(),
+      'hasAutoReplied': true,
+    });
+  }
+
+  // Check if auto-reply was already sent
+  Future<bool> hasAutoReplied(String conversationId) async {
+    final doc = await _db.collection('conversations').doc(conversationId).get();
+    return doc.data()?['hasAutoReplied'] == true;
+  }
+
+  // Send message with auto-reply trigger for first user message
+  Future<void> sendMessageWithAutoReply({
+    required String text,
+    required String senderId,
+    required String senderName,
+    required String conversationId,
+    String? hostId,
+    String? hostName,
+  }) async {
+    // Send the actual message
+    await sendMessage(text, senderId, senderName, conversationId);
+    
+    // Check if this warrants an auto-reply (first message from driver to host)
+    if (hostId != null && hostName != null && senderId != hostId) {
+      final alreadyReplied = await hasAutoReplied(conversationId);
+      if (!alreadyReplied) {
+        // Small delay to make it feel more natural
+        await Future.delayed(const Duration(milliseconds: 500));
+        await sendAutoReply(conversationId, hostId, hostName);
+      }
+    }
   }
 }

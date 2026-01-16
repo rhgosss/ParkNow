@@ -175,7 +175,8 @@ class _BookingCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (isActive)
+                  // TASK 4 FIX: Only show PIN and Cancel for active FUTURE bookings
+                  if (isActive) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
@@ -197,16 +198,19 @@ class _BookingCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () => _confirmCancellation(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(60, 30),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    // Cancel button only for FUTURE active bookings (start time in future)
+                    if (booking.startTime.isAfter(DateTime.now()))
+                      TextButton(
+                        onPressed: () => _confirmCancellation(context),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(60, 30),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Ακύρωση'),
                       ),
-                      child: const Text('Ακύρωση'),
-                    ),
+                  ],
                   if (!isActive)
                     OutlinedButton.icon(
                       onPressed: () => _showReviewDialog(context),

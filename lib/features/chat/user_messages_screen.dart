@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/data/chat_service.dart';
-import '../../../../core/state/app_state_scope.dart';
+import '../../core/data/chat_service.dart';
+import '../../core/state/app_state_scope.dart';
 
-class HostMessagesScreen extends StatefulWidget {
-  const HostMessagesScreen({super.key});
+/// Messages screen for DRIVER/USER mode - shows only conversations where user is the driver
+class UserMessagesScreen extends StatefulWidget {
+  const UserMessagesScreen({super.key});
 
   @override
-  State<HostMessagesScreen> createState() => _HostMessagesScreenState();
+  State<UserMessagesScreen> createState() => _UserMessagesScreenState();
 }
 
-class _HostMessagesScreenState extends State<HostMessagesScreen> {
+class _UserMessagesScreenState extends State<UserMessagesScreen> {
   List<Map<String, dynamic>> _conversations = [];
   bool _loading = true;
 
@@ -20,7 +21,6 @@ class _HostMessagesScreenState extends State<HostMessagesScreen> {
     _loadConversations();
   }
   
-  // Reload when returning (in case new messages) - basic implementation
   @override
   void didChangeDependencies() {
      super.didChangeDependencies();
@@ -31,11 +31,10 @@ class _HostMessagesScreenState extends State<HostMessagesScreen> {
     final currentUser = AppStateScope.of(context).currentUser;
     if (currentUser == null) return;
     
-    // Also init chat service just in case
     await ChatService().init();
 
-    // HOST MODE: Only show conversations where user is the HOST
-    final convs = await ChatService().getConversationsForHost(currentUser.id);
+    // USER/DRIVER MODE: Only show conversations where user is the DRIVER
+    final convs = await ChatService().getConversationsForDriver(currentUser.id);
     if (mounted) {
       setState(() {
         _conversations = convs;
@@ -51,7 +50,6 @@ class _HostMessagesScreenState extends State<HostMessagesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        // leading: const BackButton(), // Default back button is fine if pushed
         title: const Text('Μηνύματα'),
         automaticallyImplyLeading: true,
       ),
@@ -65,6 +63,9 @@ class _HostMessagesScreenState extends State<HostMessagesScreen> {
                       Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey.shade300),
                       const SizedBox(height: 16),
                       const Text('Δεν υπάρχουν μηνύματα', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                      const SizedBox(height: 8),
+                      const Text('Τα μηνύματα θα εμφανιστούν εδώ όταν κάνετε κράτηση', 
+                        style: TextStyle(color: Colors.grey, fontSize: 14)),
                     ],
                   ),
                 )
@@ -74,16 +75,8 @@ class _HostMessagesScreenState extends State<HostMessagesScreen> {
                   itemBuilder: (context, index) {
                     final convo = _conversations[index];
                     final String convId = convo['id'];
-                    final String driverId = convo['driverId'] ?? '';
-                    final String driverName = convo['driverName'] ?? 'Driver';
-                    final String hostId = convo['hostId'] ?? '';
                     final String hostName = convo['hostName'] ?? 'Host';
                     final String spotTitle = convo['spotTitle'] ?? 'Parking Spot';
-                    
-                    // Identify other user
-                    final bool isMeDriver = currentUser.id == driverId;
-                    final String otherName = isMeDriver ? hostName : driverName;
-                    final String myRoleLabel = isMeDriver ? 'Οδηγός' : 'Host';
                     
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -94,7 +87,7 @@ class _HostMessagesScreenState extends State<HostMessagesScreen> {
                       ),
                       child: InkWell(
                         onTap: () {
-                           context.push(Uri(path: '/chat', queryParameters: {'id': convId, 'name': otherName}).toString());
+                           context.push(Uri(path: '/chat', queryParameters: {'id': convId, 'name': hostName}).toString());
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Padding(
@@ -104,7 +97,7 @@ class _HostMessagesScreenState extends State<HostMessagesScreen> {
                               CircleAvatar(
                                 radius: 24,
                                 backgroundColor: const Color(0xFFEFF4FF),
-                                child: Text(otherName.isNotEmpty ? otherName[0].toUpperCase() : '?', 
+                                child: Text(hostName.isNotEmpty ? hostName[0].toUpperCase() : '?', 
                                     style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
                               ),
                               const SizedBox(width: 14),
@@ -112,7 +105,7 @@ class _HostMessagesScreenState extends State<HostMessagesScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(otherName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                    Text(hostName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                                     const SizedBox(height: 4),
                                     Text(spotTitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
                                   ],

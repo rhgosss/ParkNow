@@ -2,10 +2,13 @@
 // Generated manually with user's Firebase project settings
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
+    if (kIsWeb) {
+      return web;
+    }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -17,6 +20,16 @@ class DefaultFirebaseOptions {
         throw UnsupportedError('DefaultFirebaseOptions not configured for this platform.');
     }
   }
+
+  // Web configuration
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyCe2JxiY16hg-pXPSmkxvtmGfc53MeW2es',
+    appId: '1:743871600386:web:e18b2d4587f2b30715541b',
+    messagingSenderId: '743871600386',
+    projectId: 'parknow-ec535',
+    storageBucket: 'parknow-ec535.firebasestorage.app',
+    authDomain: 'parknow-ec535.firebaseapp.com',
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCe2JxiY16hg-pXPSmkxvtmGfc53MeW2es',
@@ -45,3 +58,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'parknow-ec535.firebasestorage.app',
   );
 }
+

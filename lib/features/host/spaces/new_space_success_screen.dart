@@ -116,10 +116,7 @@ class NewSpaceSuccessScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              TextButton(
-                onPressed: () => context.go('/main'),
-                child: const Text('Επόμενα βήματα'),
-              ),
+              // "Επόμενα βήματα" button removed as requested
             ],
           ),
         ),

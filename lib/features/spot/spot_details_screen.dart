@@ -1,4 +1,6 @@
 // lib/features/spot/spot_details_screen.dart
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -138,7 +140,9 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                 radius: 24,
                 backgroundColor: const Color(0xFFE5E7EB),
                 backgroundImage: s.ownerPhotoUrl != null && s.ownerPhotoUrl!.isNotEmpty
-                    ? NetworkImage(s.ownerPhotoUrl!)
+                    ? (s.ownerPhotoUrl!.startsWith('data:')
+                        ? MemoryImage(_decodeBase64(s.ownerPhotoUrl!))
+                        : NetworkImage(s.ownerPhotoUrl!) as ImageProvider)
                     : null,
                 child: s.ownerPhotoUrl == null || s.ownerPhotoUrl!.isEmpty
                     ? Text(
@@ -217,6 +221,11 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
         child: Text(text, style: TextStyle(fontWeight: FontWeight.w600, color: active ? Colors.black : Colors.grey)),
       ),
     );
+  }
+
+  Uint8List _decodeBase64(String dataUrl) {
+    final base64String = dataUrl.split(',').last;
+    return base64Decode(base64String);
   }
 }
 

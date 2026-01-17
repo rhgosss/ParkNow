@@ -57,12 +57,7 @@ class _NewSearchTab extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('ParkNow'),
-        actions: [
-          IconButton(
-            onPressed: () => context.push('/user-messages'),
-            icon: const Icon(Icons.chat_bubble_outline),
-          ),
-        ],
+        // Messages button removed from Search tab
       ),
       body: SafeArea(
         child: StreamBuilder<List<GarageSpot>>(

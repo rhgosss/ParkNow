@@ -18,7 +18,9 @@ class _ResultsListScreenState extends State<ResultsListScreen> {
   @override
   Widget build(BuildContext context) {
     // Get results from service
-    final results = ParkingService().search(widget.query ?? '');
+    final allResults = ParkingService().search(widget.query ?? '');
+    // BUG 1 FIX: Filter hidden spots - users should only see visible spots
+    final results = allResults.where((s) => s.isVisible).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -70,12 +72,25 @@ class _ResultsListScreenState extends State<ResultsListScreen> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                  child: Container(
-                    height: 170,
-                    width: double.infinity,
-                    color: Colors.grey[300], // Placeholder color
-                    child: const Icon(Icons.local_parking, size: 60, color: Colors.grey),
-                  ),
+                  child: spot.imageUrl != null && spot.imageUrl!.isNotEmpty
+                    ? Image.network(
+                        spot.imageUrl!,
+                        height: 170,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 170,
+                          width: double.infinity,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.local_parking, size: 60, color: Colors.grey),
+                        ),
+                      )
+                    : Container(
+                        height: 170,
+                        width: double.infinity,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.local_parking, size: 60, color: Colors.grey),
+                      ),
                 ),
                 Positioned(
                   top: 10,

@@ -104,7 +104,10 @@ GoRouter createRouter(AppState appState) {
       ),
       GoRoute(path: '/my-bookings', builder: (_, __) => const MyBookingsScreen()),
 
-      GoRoute(path: '/host/new-space', builder: (_, __) => const NewSpaceStep1Screen()),
+      GoRoute(
+        path: '/host/new-space', 
+        builder: (context, state) => NewSpaceStep1Screen(queryParams: state.uri.queryParameters),
+      ),
       GoRoute(
         path: '/host/access', 
         builder: (context, state) => AccessMethodScreen(params: state.uri.queryParameters),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../core/data/parking_service.dart';
 import '../../../core/state/app_state_scope.dart';
 
@@ -15,8 +16,36 @@ class GarageMapTab extends StatefulWidget {
 class _GarageMapTabState extends State<GarageMapTab> {
   GarageSpot? _selected;
   DateTime _filterDate = DateTime.now(); // Default now
+  GoogleMapController? _mapController;
 
   static const LatLng _athensCenter = LatLng(37.9838, 23.7275);
+
+  @override
+  void initState() {
+    super.initState();
+    _requestLocationPermission();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+  }
+
+  Future<void> _goToMyLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(position.latitude, position.longitude),
+          16,
+        ),
+      );
+    } catch (e) {
+      // Location not available
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,11 +57,9 @@ class _GarageMapTabState extends State<GarageMapTab> {
       builder: (context, snapshot) {
         final allSpots = snapshot.data ?? [];
         
-        // Filter: visible spots, exclude own spots in driver mode (conflict prevention)
+        // Filter: visible spots only (removed ownerId filter so hosts can see their spots)
         final visibleSpots = allSpots.where((s) {
           if (!s.isVisible) return false;
-          // Host can't see/book their own spots when in user mode
-          if (currentUser != null && s.ownerId == currentUser.id) return false;
           return true;
         }).toList();
         
@@ -46,10 +73,11 @@ class _GarageMapTabState extends State<GarageMapTab> {
                   target: _athensCenter,
                   zoom: 14,
                 ),
-                myLocationButtonEnabled: false,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: false, // Using custom button
                 zoomControlsEnabled: false,
                 markers: markers,
-                onMapCreated: (c) {},
+                onMapCreated: (c) => _mapController = c,
                 onTap: (_) => setState(() => _selected = null),
               ),
           SafeArea(
@@ -67,58 +95,18 @@ class _GarageMapTabState extends State<GarageMapTab> {
                       ),
                       const SizedBox(width: 10),
                       _RoundIconButton(
+                        icon: Icons.my_location,
+                        onTap: _goToMyLocation,
+                      ),
+                      const SizedBox(width: 10),
+                      _RoundIconButton(
                         icon: Icons.tune,
                         onTap: () => context.push('/filters'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('Διαθεσιμότητα:',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: () =>
-                              setState(() => _filterDate = DateTime.now()),
-                          child: Text(
-                            'Τώρα',
-                            style: TextStyle(
-                              color: _isNow(_filterDate)
-                                  ? const Color(0xFF2563EB)
-                                  : Colors.black54,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text('|', style: TextStyle(color: Colors.grey)),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: () => setState(() => _filterDate =
-                              DateTime.now().add(const Duration(hours: 12))),
-                          child: Text(
-                            'Αργότερα',
-                            style: TextStyle(
-                              color: !_isNow(_filterDate)
-                                  ? const Color(0xFF2563EB)
-                                  : Colors.black54,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                  // Legend only - Removed Now/Later toggle
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

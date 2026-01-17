@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../../shared/widgets/app_widgets.dart';
+import '../../../core/data/firebase_storage_service.dart';
 
 class NewSpaceStep1Screen extends StatefulWidget {
   final Map<String, String>? queryParams; // Receive edit params
@@ -33,6 +34,7 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
   String? _editSpotId; // Track if we're editing
   String? _existingImageUrl; // Preserve existing image during edit
   String? _existingAccessMethod; // Preserve existing access method
+  bool _isUploading = false; // Track upload state
 
   @override
   void initState() {
@@ -141,7 +143,7 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New Parking Space')),
+      appBar: AppBar(title: Text(_editSpotId != null ? 'Επεξεργασία Χώρου' : 'Νέος Χώρος Στάθμευσης')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -233,12 +235,21 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFE5E7EB)),
-                  image: _selectedImageBytes != null ? DecorationImage(
-                    image: MemoryImage(_selectedImageBytes!),
-                    fit: BoxFit.cover,
-                  ) : null,
+                  // BUG 3 FIX: Show existing image when editing (if no new image selected)
+                  image: _selectedImageBytes != null 
+                    ? DecorationImage(
+                        image: MemoryImage(_selectedImageBytes!),
+                        fit: BoxFit.cover,
+                      ) 
+                    : (_existingImageUrl != null 
+                        ? DecorationImage(
+                            image: NetworkImage(_existingImageUrl!),
+                            fit: BoxFit.cover,
+                          )
+                        : null),
                 ),
-                child: _selectedImageBytes == null ? const Column(
+                // BUG 3 FIX: Hide placeholder when we have either new or existing image
+                child: (_selectedImageBytes == null && _existingImageUrl == null) ? const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.add_photo_alternate_outlined, size: 34, color: Color(0xFF6B7280)),
@@ -251,8 +262,36 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
 
             const SizedBox(height: 18),
             PrimaryButton(
-              text: _editSpotId != null ? 'Αποθήκευση Αλλαγών' : 'Next Step',
-              onPressed: () {
+              text: _isUploading 
+                ? 'Μεταφόρτωση...' 
+                : (_editSpotId != null ? 'Αποθήκευση Αλλαγών' : 'Next Step'),
+              onPressed: _isUploading ? null : () async {
+                // Generate a spot ID for the image upload path
+                final spotId = _editSpotId ?? 'spot_${DateTime.now().millisecondsSinceEpoch}';
+                String? imageUrl = _existingImageUrl; // Start with existing URL
+                
+                // Upload new image if selected
+                if (_selectedImageBytes != null) {
+                  setState(() => _isUploading = true);
+                  
+                  imageUrl = await FirebaseStorageService().uploadSpotImage(
+                    imageBytes: _selectedImageBytes!,
+                    spotId: spotId,
+                  );
+                  
+                  if (!mounted) return;
+                  setState(() => _isUploading = false);
+                  
+                  if (imageUrl == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Αποτυχία μεταφόρτωσης εικόνας. Δοκιμάστε ξανά.')),
+                    );
+                    return;
+                  }
+                }
+                
+                // Navigate to access method screen with all data
+                if (!mounted) return;
                 context.push(Uri(path: '/host/access', queryParameters: {
                   'title': titleCtrl.text,
                   'addr': addressCtrl.text,
@@ -262,8 +301,8 @@ class _NewSpaceStep1ScreenState extends State<NewSpaceStep1Screen> {
                   'lng': _selectedPos.longitude.toString(),
                   if (_editSpotId != null) 'edit': 'true',
                   if (_editSpotId != null) 'id': _editSpotId!,
-                  // Preserve existing image if user didn't pick a new one
-                  if (_existingImageUrl != null) 'existingImageUrl': _existingImageUrl!,
+                  // Pass image URL (either new upload or existing)
+                  if (imageUrl != null) 'existingImageUrl': imageUrl,
                   if (_existingAccessMethod != null) 'existingAccessMethod': _existingAccessMethod!,
                 }).toString());
               },

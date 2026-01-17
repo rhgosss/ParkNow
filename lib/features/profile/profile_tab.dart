@@ -208,6 +208,12 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
             const SizedBox(height: 10),
             _menuTile(
+              icon: Icons.chat_bubble_outline, 
+              text: 'Μηνύματα', 
+              onTap: () => context.push('/user-messages'),
+            ),
+            const SizedBox(height: 10),
+            _menuTile(
               icon: Icons.swap_horiz, 
               text: currentUser.role == UserRole.driver ? 'Λειτουργία Host' : 'Λειτουργία Driver', 
               onTap: () async {

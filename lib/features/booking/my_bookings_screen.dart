@@ -18,6 +18,32 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     setState(() {});
   }
 
+  Future<void> _confirmClearHistory(BuildContext context, String userId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Διαγραφή Ιστορικού;'),
+        content: const Text('Είστε σίγουροι ότι θέλετε να διαγράψετε όλο το ιστορικό κρατήσεων; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ακύρωση')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true), 
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Διαγραφή Όλων'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ParkingService().clearAllBookings(userId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Το ιστορικό διαγράφηκε.')));
+        _refresh();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = AppStateScope.of(context).currentUser;
@@ -38,22 +64,47 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Οι Κρατήσεις μου'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Ενεργές'),
-              Tab(text: 'Ιστορικό'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _BookingsList(bookings: activeBookings, isActive: true, onRefresh: _refresh),
-            _BookingsList(bookings: pastBookings, isActive: false, onRefresh: _refresh),
-          ],
-        ),
+      child: Builder(
+        builder: (context) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Οι Κρατήσεις μου'),
+              actions: [
+                // Clear History button - only show when on History tab
+                Builder(
+                  builder: (ctx) {
+                    final tabController = DefaultTabController.of(ctx);
+                    return AnimatedBuilder(
+                      animation: tabController,
+                      builder: (context, child) {
+                        if (tabController.index == 1 && pastBookings.isNotEmpty) {
+                          return IconButton(
+                            icon: const Icon(Icons.delete_sweep),
+                            tooltip: 'Διαγραφή Ιστορικού',
+                            onPressed: () => _confirmClearHistory(context, currentUser.id),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    );
+                  },
+                ),
+              ],
+              bottom: const TabBar(
+                tabs: [
+                  Tab(text: 'Ενεργές'),
+                  Tab(text: 'Ιστορικό'),
+                ],
+              ),
+            ),
+            body: TabBarView(
+              children: [
+                _BookingsList(bookings: activeBookings, isActive: true, onRefresh: _refresh),
+                _BookingsList(bookings: pastBookings, isActive: false, onRefresh: _refresh),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -135,6 +186,17 @@ class _BookingCard extends StatelessWidget {
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                     ),
                   ),
+                  // Delete button for history items
+                  if (!isActive)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      color: Colors.red.shade400,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Διαγραφή',
+                      onPressed: () => _confirmDeletion(context),
+                    ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
@@ -232,6 +294,32 @@ class _BookingCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeletion(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Διαγραφή κράτησης;'),
+        content: const Text('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την κράτηση από το ιστορικό;'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ακύρωση')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true), 
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Διαγραφή'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ParkingService().deleteBooking(booking.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Η κράτηση διαγράφηκε.')));
+        onRefresh();
+      }
+    }
   }
 
   Future<void> _confirmCancellation(BuildContext context) async {

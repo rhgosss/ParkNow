@@ -48,19 +48,7 @@ class PaymentScreen extends StatelessWidget {
                 },
               ),
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 54,
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () async {
-                  await _createBooking(context);
-                  if (context.mounted) context.go('/active-booking');
-                },
-                style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                child: const Text('Πληρωμή στο κατάστημα (demo)'),
-              ),
-            ),
+
           ],
         ),
       ),

@@ -9,6 +9,7 @@ class ChatMessage {
   final String senderName;
   final String conversationId;
   final DateTime timestamp;
+  final bool isRead;
 
   ChatMessage({
     required this.id, 
@@ -17,6 +18,7 @@ class ChatMessage {
     required this.senderName,
     required this.conversationId,
     required this.timestamp,
+    this.isRead = false,
   });
 
   Map<String, dynamic> toFirestore() {
@@ -26,6 +28,7 @@ class ChatMessage {
       'senderName': senderName,
       'conversationId': conversationId,
       'timestamp': Timestamp.fromDate(timestamp),
+      'isRead': isRead,
     };
   }
 
@@ -37,6 +40,7 @@ class ChatMessage {
       senderName: data['senderName'] ?? 'User',
       conversationId: data['conversationId'] ?? 'default',
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isRead: data['isRead'] ?? false,
     );
   }
 }
@@ -52,10 +56,33 @@ class ChatService extends ChangeNotifier {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  /// Generate a canonical conversation ID that is the same regardless of who initiates
+  /// For simple 1:1 chats without spot context
+  static String getCanonicalChatId(String uid1, String uid2) {
+    // Sort alphabetically to ensure consistent ID regardless of who starts
+    if (uid1.compareTo(uid2) < 0) {
+      return '${uid1}_$uid2';
+    } else {
+      return '${uid2}_$uid1';
+    }
+  }
+
+  /// Generate a canonical conversation ID for spot-related conversations
+  static String getCanonicalSpotChatId(String uid1, String uid2, String spotId, [String? suffix]) {
+    // Sort user IDs alphabetically for consistency
+    final sortedUserPart = uid1.compareTo(uid2) < 0 
+        ? '${uid1}_$uid2' 
+        : '${uid2}_$uid1';
+    if (suffix != null) {
+      return '${sortedUserPart}_${spotId}_$suffix';
+    }
+    return '${sortedUserPart}_$spotId';
+  }
+
   Future<void> init() async {
     if (_initialized) return;
     
-    // Listen to ALL messages (optimally we'd query by user's conversations, but for this demo this is fine)
+    // Listen to ALL messages with real-time updates
     _db.collection('messages').orderBy('timestamp').snapshots().listen((snapshot) {
       _messages = snapshot.docs.map((doc) {
         return ChatMessage.fromFirestore(doc.id, doc.data());
@@ -70,14 +97,20 @@ class ChatService extends ChangeNotifier {
     return _messages.where((m) => m.conversationId == conversationId).toList();
   }
   
-  // Get all conversation IDs for a user (either sender or part of ID)
-  // Convention: conversationId = "driverId_hostId"
+  /// Stream messages for a specific conversation (for StreamBuilder usage)
+  Stream<List<ChatMessage>> getMessagesStream(String conversationId) {
+    return _db
+        .collection('messages')
+        .where('conversationId', isEqualTo: conversationId)
+        .orderBy('timestamp')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ChatMessage.fromFirestore(doc.id, doc.data()))
+            .toList());
+  }
+
+  // Get all conversation IDs for a user
   List<String> getConversationsForUser(String userId) {
-    // If I am driver, my ID is first part. If host, second part.
-    // Simplifying: just check if ID is in the string? 
-    // Or better: filter unique conversationIds where userId matches one of the participants.
-    // For now, let's just return all unique IDs that contain the userId?
-    // Actually, distinct conversationIds.
     return _messages.map((m) => m.conversationId).toSet().where((id) => id.contains(userId)).toList();
   }
 
@@ -93,8 +126,7 @@ class ChatService extends ChangeNotifier {
     
     await _db.collection('messages').add(msg.toFirestore());
     
-    // TASK 2 FIX: Update lastMessageAt so conversation appears at top of list
-    // and is visible to both parties
+    // Update lastMessageAt so conversation appears at top of list for both parties
     await _db.collection('conversations').doc(conversationId).update({
       'lastMessageAt': Timestamp.now(),
     }).catchError((_) {
@@ -102,20 +134,39 @@ class ChatService extends ChangeNotifier {
     });
   }
 
+  /// Mark messages as read
+  Future<void> markMessagesAsRead(String conversationId, String readerId) async {
+    final unreadMessages = await _db.collection('messages')
+        .where('conversationId', isEqualTo: conversationId)
+        .where('isRead', isEqualTo: false)
+        .get();
+    
+    for (var doc in unreadMessages.docs) {
+      // Only mark as read if the reader is NOT the sender
+      if (doc.data()['senderId'] != readerId) {
+        await doc.reference.update({'isRead': true});
+      }
+    }
+  }
+
   // Create a conversation when booking is made
-  // TASK 2: Each conversation is tied to a specific parking spot (spotId)
   Future<String> createConversationForBooking({
     required String driverId,
     required String driverName,
     required String hostId,
     required String hostName,
-    required String spotId, // TASK 2: Per-parking messaging
+    required String spotId,
     required String spotTitle,
     required String bookingId,
   }) async {
-    // TASK 2: Convention: conversationId = "driverId_hostId_spotId_bookingId"
-    // This ensures each parking spot has its own chat thread
-    final conversationId = '${driverId}_${hostId}_${spotId}_$bookingId';
+    // Use canonical ID generation for consistency
+    final conversationId = getCanonicalSpotChatId(driverId, hostId, spotId, bookingId);
+    
+    // Check if exists first
+    final existingDoc = await _db.collection('conversations').doc(conversationId).get();
+    if (existingDoc.exists) {
+      return conversationId;
+    }
     
     // Send initial system message
     final initialMsg = ChatMessage(
@@ -129,13 +180,14 @@ class ChatService extends ChangeNotifier {
     
     await _db.collection('messages').add(initialMsg.toFirestore());
     
-    // Store conversation metadata for easy lookup (TASK 2: includes spotId)
+    // Store conversation metadata with PARTICIPANTS ARRAY for unified queries
     await _db.collection('conversations').doc(conversationId).set({
+      'participants': [driverId, hostId], // KEY FIX: Array for arrayContains queries
       'driverId': driverId,
       'driverName': driverName,
       'hostId': hostId,
       'hostName': hostName,
-      'spotId': spotId, // TASK 2: Store spotId for per-parking filtering
+      'spotId': spotId,
       'spotTitle': spotTitle,
       'bookingId': bookingId,
       'createdAt': Timestamp.now(),
@@ -145,37 +197,110 @@ class ChatService extends ChangeNotifier {
     return conversationId;
   }
 
-  // Get conversations where user is participant (as driver or host)
+  /// Get or create a conversation for contacting host about a spot (pre-booking inquiry)
+  Future<String> getOrCreateConversationForSpot({
+    required String driverId,
+    required String driverName,
+    required String hostId,
+    required String hostName,
+    required String spotId,
+    required String spotTitle,
+  }) async {
+    // Use canonical ID for consistency - same ID regardless of who initiates
+    final conversationId = getCanonicalSpotChatId(driverId, hostId, spotId, 'inquiry');
+    
+    // Check if conversation already exists
+    final existingDoc = await _db.collection('conversations').doc(conversationId).get();
+    if (existingDoc.exists) {
+      return conversationId; // Return existing conversation
+    }
+    
+    // Create new inquiry conversation
+    final initialMsg = ChatMessage(
+      id: '',
+      text: '💬 Νέα συνομιλία για "$spotTitle". Ρωτήστε ό,τι θέλετε!',
+      senderId: 'system',
+      senderName: 'ParkNow',
+      conversationId: conversationId,
+      timestamp: DateTime.now(),
+    );
+    
+    await _db.collection('messages').add(initialMsg.toFirestore());
+    
+    await _db.collection('conversations').doc(conversationId).set({
+      'participants': [driverId, hostId], // KEY FIX: Array for arrayContains queries
+      'driverId': driverId,
+      'driverName': driverName,
+      'hostId': hostId,
+      'hostName': hostName,
+      'spotId': spotId,
+      'spotTitle': spotTitle,
+      'bookingId': 'inquiry',
+      'createdAt': Timestamp.now(),
+      'lastMessageAt': Timestamp.now(),
+    });
+    
+    return conversationId;
+  }
+
+  /// Get ALL conversations where user is a participant (for unified inbox)
   Future<List<Map<String, dynamic>>> getConversationsForUserAsync(String userId) async {
-    // Query where user is driver
-    final asDriver = await _db.collection('conversations')
-        .where('driverId', isEqualTo: userId)
-        .get();
-    
-    // Query where user is host
-    final asHost = await _db.collection('conversations')
-        .where('hostId', isEqualTo: userId)
-        .get();
-    
-    final all = [...asDriver.docs, ...asHost.docs];
-    return all.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+    try {
+      // Use participants array for single query (requires Firestore index)
+      final result = await _db.collection('conversations')
+          .where('participants', arrayContains: userId)
+          .get();
+      
+      final results = result.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      
+      // Sort by last message time
+      results.sort((a, b) {
+        final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        return bTime.compareTo(aTime);
+      });
+      
+      return results;
+    } catch (e) {
+      debugPrint('Error with participants query, falling back: $e');
+      // Fallback: Query both as driver and host
+      final asDriver = await _db.collection('conversations')
+          .where('driverId', isEqualTo: userId)
+          .get();
+      
+      final asHost = await _db.collection('conversations')
+          .where('hostId', isEqualTo: userId)
+          .get();
+      
+      final all = [...asDriver.docs, ...asHost.docs];
+      final results = all.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      
+      // Deduplicate and sort
+      final seen = <String>{};
+      results.removeWhere((r) => !seen.add(r['id'] as String));
+      results.sort((a, b) {
+        final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
+        return bTime.compareTo(aTime);
+      });
+      
+      return results;
+    }
   }
 
   // Get conversations where user is HOST only (for host mode messages view)
   Future<List<Map<String, dynamic>>> getConversationsForHost(String userId) async {
     try {
-      // TASK 3 FIX: Removed orderBy to avoid composite index requirement
       final asHost = await _db.collection('conversations')
           .where('hostId', isEqualTo: userId)
           .get();
       
       final results = asHost.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
       
-      // Sort in memory instead of in query to avoid index issues
       results.sort((a, b) {
         final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
         final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        return bTime.compareTo(aTime); // Descending
+        return bTime.compareTo(aTime);
       });
       
       return results;
@@ -188,18 +313,16 @@ class ChatService extends ChangeNotifier {
   // Get conversations where user is DRIVER only (for user mode messages view)
   Future<List<Map<String, dynamic>>> getConversationsForDriver(String userId) async {
     try {
-      // TASK 3 FIX: Removed orderBy to avoid composite index requirement
       final asDriver = await _db.collection('conversations')
           .where('driverId', isEqualTo: userId)
           .get();
       
       final results = asDriver.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
       
-      // Sort in memory instead of in query to avoid index issues
       results.sort((a, b) {
         final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
         final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        return bTime.compareTo(aTime); // Descending
+        return bTime.compareTo(aTime);
       });
       
       return results;
@@ -209,7 +332,7 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  // Check if this is the first user message in a conversation (for auto-reply trigger)
+  // Check if this is the first user message in a conversation
   Future<bool> isFirstUserMessage(String conversationId, String driverId) async {
     final messages = await _db.collection('messages')
         .where('conversationId', isEqualTo: conversationId)
@@ -233,7 +356,6 @@ class ChatService extends ChangeNotifier {
     
     await _db.collection('messages').add(autoReply.toFirestore());
     
-    // Update last message timestamp
     await _db.collection('conversations').doc(conversationId).update({
       'lastMessageAt': Timestamp.now(),
       'hasAutoReplied': true,
@@ -246,7 +368,7 @@ class ChatService extends ChangeNotifier {
     return doc.data()?['hasAutoReplied'] == true;
   }
 
-  // Send message with auto-reply trigger for first user message
+  // Send message with auto-reply trigger
   Future<void> sendMessageWithAutoReply({
     required String text,
     required String senderId,
@@ -255,14 +377,11 @@ class ChatService extends ChangeNotifier {
     String? hostId,
     String? hostName,
   }) async {
-    // Send the actual message
     await sendMessage(text, senderId, senderName, conversationId);
     
-    // Check if this warrants an auto-reply (first message from driver to host)
     if (hostId != null && hostName != null && senderId != hostId) {
       final alreadyReplied = await hasAutoReplied(conversationId);
       if (!alreadyReplied) {
-        // Small delay to make it feel more natural
         await Future.delayed(const Duration(milliseconds: 500));
         await sendAutoReply(conversationId, hostId, hostName);
       }

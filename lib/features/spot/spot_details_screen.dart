@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/data/parking_service.dart';
+import '../../../core/data/chat_service.dart';
 import '../../../core/state/app_state_scope.dart';
 import '../../../shared/widgets/app_widgets.dart';
 
@@ -152,12 +153,25 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                     : null,
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Ιδιοκτήτης', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  Text(s.ownerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Ιδιοκτήτης', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(s.ownerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  ],
+                ),
+              ),
+              // Contact Host button
+              OutlinedButton.icon(
+                onPressed: () => _contactHost(context, s),
+                icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                label: const Text('Επικοινωνία'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF2563EB),
+                  side: const BorderSide(color: Color(0xFF2563EB)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
               ),
             ],
           ),
@@ -221,6 +235,41 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
         child: Text(text, style: TextStyle(fontWeight: FontWeight.w600, color: active ? Colors.black : Colors.grey)),
       ),
     );
+  }
+
+  Future<void> _contactHost(BuildContext context, GarageSpot spot) async {
+    final currentUser = AppStateScope.of(context).currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Πρέπει να συνδεθείτε για να στείλετε μήνυμα')),
+      );
+      return;
+    }
+
+    // Can't message your own spot
+    if (spot.ownerId == currentUser.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Δεν μπορείτε να στείλετε μήνυμα στον εαυτό σας')),
+      );
+      return;
+    }
+
+    // Get or create conversation for this spot
+    final conversationId = await ChatService().getOrCreateConversationForSpot(
+      driverId: currentUser.id,
+      driverName: currentUser.name,
+      hostId: spot.ownerId ?? 'unknown',
+      hostName: spot.ownerName,
+      spotId: spot.id,
+      spotTitle: spot.title,
+    );
+
+    if (context.mounted) {
+      context.push(Uri(path: '/chat', queryParameters: {
+        'id': conversationId,
+        'name': spot.ownerName,
+      }).toString());
+    }
   }
 
   Uint8List _decodeBase64(String dataUrl) {

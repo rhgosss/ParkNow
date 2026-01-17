@@ -261,6 +261,33 @@ class ParkingService {
     }
   }
 
+  /// Permanently delete a booking from history (removes from Firestore)
+  Future<void> deleteBooking(String bookingId) async {
+    try {
+      await _db.collection('bookings').doc(bookingId).delete();
+      // Local update happens via stream listener automatically
+    } catch (e) {
+      print('Error deleting booking: $e');
+    }
+  }
+
+  /// Clear all past bookings for a user (bookings that have ended)
+  Future<void> clearAllBookings(String userId) async {
+    try {
+      final now = DateTime.now();
+      final userBookings = _bookings.where((b) => 
+        b.userId == userId && b.endTime.isBefore(now)
+      ).toList();
+      
+      for (var booking in userBookings) {
+        await _db.collection('bookings').doc(booking.id).delete();
+      }
+      // Local updates happen via stream listener automatically
+    } catch (e) {
+      print('Error clearing bookings: $e');
+    }
+  }
+
   List<Booking> getBookingsForUser(String userId) {
     return _bookings.where((b) => b.userId == userId).toList();
   }

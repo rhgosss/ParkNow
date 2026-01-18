@@ -105,7 +105,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                       children: [
                         CircleAvatar(
                           radius: 40,
-                          backgroundColor: const Color(0xFFE31C5F),
+                          backgroundColor: AppColors.primary,
                           backgroundImage: currentUser.photoUrl != null && currentUser.photoUrl!.isNotEmpty
                               ? (currentUser.photoUrl!.startsWith('data:')
                                   ? MemoryImage(base64Decode(currentUser.photoUrl!.split(',').last))
@@ -121,7 +121,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE31C5F),
+                              color: AppColors.primary,
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                             ),
@@ -149,7 +149,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE31C5F).withAlpha(25),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
@@ -157,7 +157,7 @@ class _HostProfileScreenState extends State<HostProfileScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFFE31C5F),
+                        color: AppColors.primary,
                       ),
                     ),
                   ),
@@ -244,7 +244,7 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(number, style: const TextStyle(color: Color(0xFFE31C5F), fontWeight: FontWeight.w800, fontSize: 16)),
+        Text(number, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 16)),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(color: AppColors.mutedText)),
       ],

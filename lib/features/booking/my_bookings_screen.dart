@@ -260,17 +260,18 @@ class _BookingCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Cancel button for all active bookings
-                    TextButton(
-                      onPressed: () => _confirmCancellation(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(60, 30),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    // Cancel button - ONLY show if booking has NOT STARTED yet
+                    if (booking.startTime.isAfter(DateTime.now()))
+                      TextButton(
+                        onPressed: () => _confirmCancellation(context),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(60, 30),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Ακύρωση'),
                       ),
-                      child: const Text('Ακύρωση'),
-                    ),
                   ],
                   if (!isActive)
                     OutlinedButton.icon(

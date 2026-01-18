@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/data/parking_service.dart';
 import '../../../core/data/chat_service.dart';
+import '../../../core/data/auth_repository.dart';
 import '../../../core/state/app_state_scope.dart';
 import '../../../shared/widgets/app_widgets.dart';
 
@@ -92,6 +93,11 @@ class PaymentScreen extends StatelessWidget {
 
     // Create booking immediately
     await ParkingService().createBooking(booking);
+    
+    // Add revenue to host's total income
+    if (spot.ownerId != null) {
+      await AuthRepository().addHostIncome(spot.ownerId!, price);
+    }
     
     // Create chat room between driver and host using new chat_rooms structure
     await ChatService().getOrCreateChatRoom(

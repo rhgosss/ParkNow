@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/utils/ui.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/data/parking_service.dart';
 import '../../../core/state/app_state_scope.dart';
 
@@ -57,7 +58,7 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
                        ElevatedButton(
                          onPressed: () => context.push('/host/new-space'),
                          style: ElevatedButton.styleFrom(
-                           backgroundColor: const Color(0xFFE31C5F),
+                           backgroundColor: AppColors.primary,
                            foregroundColor: Colors.white,
                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -174,7 +175,7 @@ class _HostSpacesScreenState extends State<HostSpacesScreen> {
           ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => context.push('/host/new-space'),
-            backgroundColor: const Color(0xFFE31C5F),
+            backgroundColor: AppColors.primary,
             elevation: 4,
             icon: const Icon(Icons.add, color: Colors.white),
             label: const Text('List Space', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),

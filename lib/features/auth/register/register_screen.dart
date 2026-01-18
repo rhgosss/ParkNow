@@ -1,4 +1,5 @@
 // lib/features/auth/register/register_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -23,10 +24,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   
   bool _isLoading = false;
   String? _errorMessage;
-  bool _autoValidate = false; // Enable validation after first submit attempt
+  bool _autoValidate = false;
+  
+  // TASK 2: Async email validation state
+  Timer? _emailDebounce;
+  bool _isCheckingEmail = false;
+  String? _emailAsyncError;
+  bool _emailVerified = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Set up listener for email field with debounce
+    emailController.addListener(_onEmailChanged);
+  }
 
   @override
   void dispose() {
+    _emailDebounce?.cancel();
     nameController.dispose();
     lastNameController.dispose();
     emailController.dispose();
@@ -36,6 +51,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  // TASK 2: Debounced email check
+  void _onEmailChanged() {
+    // Cancel previous timer
+    _emailDebounce?.cancel();
+    
+    final email = emailController.text.trim();
+    
+    // Reset states
+    setState(() {
+      _emailAsyncError = null;
+      _emailVerified = false;
+    });
+    
+    // Validate format first
+    if (email.isEmpty || _validateEmailFormat(email) != null) {
+      return;
+    }
+    
+    // Start debounce timer (500ms delay)
+    _emailDebounce = Timer(const Duration(milliseconds: 500), () {
+      _checkEmailExists(email);
+    });
+  }
+
+  Future<void> _checkEmailExists(String email) async {
+    setState(() => _isCheckingEmail = true);
+    
+    try {
+      final exists = await AuthRepository().emailExists(email);
+      if (mounted) {
+        setState(() {
+          _isCheckingEmail = false;
+          if (exists) {
+            _emailAsyncError = 'Αυτό το email χρησιμοποιείται ήδη';
+            _emailVerified = false;
+          } else {
+            _emailAsyncError = null;
+            _emailVerified = true;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingEmail = false;
+          // Don't block on network errors, but don't mark as verified
+          _emailVerified = false;
+        });
+      }
+    }
+  }
+
   // Real-time validators for TextFormField
   String? _validateName(String? value) {
     if (value == null || value.isEmpty) return 'Το όνομα είναι υποχρεωτικό';
@@ -43,10 +110,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  String? _validateEmail(String? value) {
+  String? _validateEmailFormat(String? value) {
     if (value == null || value.isEmpty) return 'Το email είναι υποχρεωτικό';
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(value)) return 'Μη έγκυρη μορφή email';
+    return null;
+  }
+
+  // Combined email validator (format + async)
+  String? _validateEmail(String? value) {
+    // First check format
+    final formatError = _validateEmailFormat(value);
+    if (formatError != null) return formatError;
+    
+    // Then check async error
+    if (_emailAsyncError != null) return _emailAsyncError;
+    
     return null;
   }
 
@@ -68,6 +147,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  // TASK 2: Check if Next button should be enabled
+  bool get _canProceed {
+    if (_isLoading || _isCheckingEmail) return false;
+    if (_emailAsyncError != null) return false;
+    // Email must be verified as unique (or at least checked without error)
+    final email = emailController.text.trim();
+    if (email.isNotEmpty && _validateEmailFormat(email) == null && !_emailVerified) {
+      return false; // Email not yet verified
+    }
+    return true;
+  }
+
   Future<void> _validateAndProceed() async {
     // Enable auto-validation after first attempt
     setState(() => _autoValidate = true);
@@ -80,26 +171,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return; // Stop if validation fails
     }
 
+    // TASK 2: Block if email not verified or has error
+    if (_emailAsyncError != null) {
+      setState(() => _errorMessage = _emailAsyncError);
+      return;
+    }
+    
+    if (!_emailVerified && !_isCheckingEmail) {
+      // Email hasn't been checked yet, trigger check now
+      final email = emailController.text.trim();
+      setState(() => _isLoading = true);
+      await _checkEmailExists(email);
+      setState(() => _isLoading = false);
+      
+      if (_emailAsyncError != null) {
+        setState(() => _errorMessage = _emailAsyncError);
+        return;
+      }
+    }
+
     final fullName = '${nameController.text.trim()} ${lastNameController.text.trim()}'.trim();
     final email = emailController.text.trim();
     final phone = phoneController.text.trim();
     final password = passController.text;
-
-    // TASK 2: Check if email already exists BEFORE navigating
-    setState(() => _isLoading = true);
-    try {
-      final exists = await AuthRepository().emailExists(email);
-      if (exists) {
-        setState(() {
-          _errorMessage = 'Αυτό το email χρησιμοποιείται ήδη';
-          _isLoading = false;
-        });
-        return;
-      }
-    } catch (e) {
-      // Continue if check fails (might be network issue)
-    }
-    setState(() => _isLoading = false);
 
     // All validations passed, go to role selection
     if (mounted) {
@@ -189,7 +283,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Email field with real-time validation
+              // Email field with real-time async validation (TASK 2)
               TextFormField(
                 controller: emailController,
                 validator: _validateEmail,
@@ -206,6 +300,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: Colors.red, width: 2),
                   ),
+                  // TASK 2: Show loading indicator or check mark
+                  suffixIcon: _buildEmailSuffix(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -273,9 +369,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 24),
 
+              // TASK 2: Button disabled while checking or if email error
               PrimaryButton(
-                text: _isLoading ? 'Έλεγχος...' : 'Συνέχεια',
-                onPressed: _isLoading ? null : _validateAndProceed,
+                text: _isLoading || _isCheckingEmail ? 'Έλεγχος...' : 'Συνέχεια',
+                onPressed: (_isLoading || !_canProceed) ? null : _validateAndProceed,
               ),
 
               const SizedBox(height: 16),
@@ -290,5 +387,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
     );
+  }
+
+  // TASK 2: Build suffix icon for email field
+  Widget? _buildEmailSuffix() {
+    final email = emailController.text.trim();
+    
+    // Don't show anything if email is empty or invalid format
+    if (email.isEmpty || _validateEmailFormat(email) != null) {
+      return null;
+    }
+    
+    if (_isCheckingEmail) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    
+    if (_emailAsyncError != null) {
+      return Icon(Icons.cancel, color: Colors.red.shade600);
+    }
+    
+    if (_emailVerified) {
+      return Icon(Icons.check_circle, color: Colors.green.shade600);
+    }
+    
+    return null;
   }
 }

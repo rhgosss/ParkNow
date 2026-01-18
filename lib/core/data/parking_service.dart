@@ -367,6 +367,63 @@ class ParkingService {
     return rnd.nextDouble() < 0.7;
   }
 
+  /// Check if a SINGLE HOUR slot is available
+  /// Used by hourly slot grid
+  bool isHourAvailable(String spotId, DateTime hourStart) {
+    final hourEnd = hourStart.add(const Duration(hours: 1));
+    
+    // Check against real bookings
+    for (var b in _bookings) {
+      if (b.spot.id == spotId && b.active) {
+        // Conflict if booking overlaps with this hour
+        if (hourStart.isBefore(b.endTime) && hourEnd.isAfter(b.startTime)) {
+          return false;
+        }
+      }
+    }
+    
+    // For demo: use deterministic random based on spot+date+hour
+    final seed = spotId.hashCode + hourStart.day + hourStart.hour;
+    final rnd = Random(seed);
+    return rnd.nextDouble() < 0.7; // 70% chance available
+  }
+
+  /// Get availability for each hour slot (08:00 - 22:00)
+  /// Returns Map<int, bool> where key is hour (8-21) and value is availability
+  Map<int, bool> getHourlyAvailability(String spotId, DateTime date) {
+    final result = <int, bool>{};
+    for (int hour = 8; hour < 22; hour++) {
+      final slotStart = DateTime(date.year, date.month, date.day, hour);
+      result[hour] = isHourAvailable(spotId, slotStart);
+    }
+    return result;
+  }
+
+  /// Get day-level availability for calendar coloring
+  /// Returns: 'full' (all hours booked), 'partial' (<50% available), 'available' (>=50% available)
+  String getDayAvailability(String spotId, DateTime date) {
+    final hourly = getHourlyAvailability(spotId, date);
+    final availableHours = hourly.values.where((v) => v).length;
+    final totalHours = hourly.length; // 14 hours (08:00-22:00)
+    
+    if (availableHours == 0) return 'full';
+    if (availableHours < totalHours / 2) return 'partial';
+    return 'available';
+  }
+
+  /// CRITICAL: Check if a TIME RANGE is available for multi-hour bookings
+  /// Returns null if available, or error message if conflict exists
+  String? isTimeRangeAvailable(String spotId, DateTime startTime, int durationHours) {
+    for (int i = 0; i < durationHours; i++) {
+      final hour = DateTime(startTime.year, startTime.month, startTime.day, startTime.hour + i);
+      if (!isHourAvailable(spotId, hour)) {
+        final hourStr = '${hour.hour.toString().padLeft(2, '0')}:00';
+        return 'Conflict: The hour $hourStr is already booked';
+      }
+    }
+    return null; // All hours available
+  }
+
   // === DEMO DATA GENERATION ===
   
   void _generateDemoSpots() {

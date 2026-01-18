@@ -335,6 +335,17 @@ class AuthRepository extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Add income to a host's total when a booking is made
+  Future<void> addHostIncome(String hostId, double amount) async {
+    try {
+      await _db.collection('users').doc(hostId).update({
+        'totalIncome': FieldValue.increment(amount),
+      });
+    } catch (e) {
+      debugPrint('Error adding host income: $e');
+    }
+  }
+
 
   // Handle Firebase Auth errors with Greek messages
   Exception _handleAuthError(FirebaseAuthException e) {

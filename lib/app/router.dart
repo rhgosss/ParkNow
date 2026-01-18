@@ -26,6 +26,7 @@ import '../features/search/results_list_screen.dart';
 import '../features/spot/spot_details_screen.dart';
 
 import '../features/booking/date_picker_screen.dart';
+import '../features/booking/slot_booking_screen.dart';
 import '../features/booking/booking_confirm_screen.dart';
 import '../features/booking/my_bookings_screen.dart';
 import '../features/payment/payment_screen.dart';
@@ -84,6 +85,10 @@ GoRouter createRouter(AppState appState) {
       GoRoute(
         path: '/date', 
         builder: (context, state) => DatePickerScreen(params: state.uri.queryParameters),
+      ),
+      GoRoute(
+        path: '/slot-booking', 
+        builder: (context, state) => SlotBookingScreen(params: state.uri.queryParameters),
       ),
       GoRoute(
         path: '/booking-confirm', 

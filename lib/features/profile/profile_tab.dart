@@ -153,9 +153,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: currentUser.role == UserRole.host 
-                          ? const Color(0xFFE31C5F).withOpacity(0.1)
-                          : AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -163,9 +161,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: currentUser.role == UserRole.host 
-                            ? const Color(0xFFE31C5F)
-                            : AppColors.primary,
+                        color: AppColors.primary,
                       ),
                     ),
                   ),

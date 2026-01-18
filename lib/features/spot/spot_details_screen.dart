@@ -208,8 +208,9 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
               onPressed: () {
                  final price = _isDaily ? s.pricePerDay : s.pricePerHour;
                  final type = _isDaily ? 'day' : 'hour';
-                 // We pass these as query params for simplicity in this demo architecture
-                 context.push(Uri(path: '/date', queryParameters: {
+                 // Use slot-booking for hourly, date picker for daily
+                 final path = _isDaily ? '/date' : '/slot-booking';
+                 context.push(Uri(path: path, queryParameters: {
                    'spotId': s.id,
                    'price': price.toString(),
                    'type': type,

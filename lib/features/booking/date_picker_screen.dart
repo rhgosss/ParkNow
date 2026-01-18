@@ -1,6 +1,7 @@
 // lib/features/booking/date_picker_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/app_widgets.dart';
 
 class DatePickerScreen extends StatefulWidget {
@@ -124,11 +125,12 @@ class _DatePickerScreenState extends State<DatePickerScreen> {
                        context.push(Uri(path: '/booking-confirm', queryParameters: p).toString());
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE31C5F), // Airbnb Red/Pink
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       elevation: 0,
                     ),
-                    child: const Text('Συνέχεια', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    child: const Text('Συνέχεια', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                   ),
                 )
               ],

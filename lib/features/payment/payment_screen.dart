@@ -93,15 +93,14 @@ class PaymentScreen extends StatelessWidget {
     // Create booking immediately
     await ParkingService().createBooking(booking);
     
-    // Create conversation between driver and host (TASK 2: includes spotId)
-    await ChatService().createConversationForBooking(
-      driverId: currentUser.id,
-      driverName: currentUser.name,
+    // Create chat room between driver and host using new chat_rooms structure
+    await ChatService().getOrCreateChatRoom(
+      spotId: spot.id,
+      spotTitle: spot.title,
       hostId: spot.ownerId ?? 'unknown_host',
       hostName: spot.ownerName,
-      spotId: spot.id, // TASK 2: Per-parking messaging
-      spotTitle: spot.title,
-      bookingId: bookingId,
+      renterId: currentUser.id,
+      renterName: currentUser.name,
     );
   }
 }

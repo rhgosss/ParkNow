@@ -3,14 +3,15 @@ import 'package:intl/intl.dart';
 import '../../core/data/chat_service.dart';
 import '../../core/state/app_state_scope.dart';
 
+/// WhatsApp-style chat screen with real-time messaging
 class ChatScreen extends StatefulWidget {
-  final String conversationId;
+  final String chatRoomId;
   final String otherUserName;
-  
+
   const ChatScreen({
-    super.key, 
-    this.conversationId = 'default',
-    this.otherUserName = 'Chat',
+    super.key,
+    required this.chatRoomId,
+    required this.otherUserName,
   });
 
   @override
@@ -18,218 +19,311 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final ctrl = TextEditingController();
-  final ScrollController _scrollCtrl = ScrollController();
-  bool _didInit = false;
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
+
+  bool _hasMarkedAsRead = false;
 
   @override
   void initState() {
     super.initState();
-    // Only call ChatService.init() here - it doesn't need context
-    ChatService().init();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Move context-dependent initialization here (runs once)
-    if (!_didInit) {
-      _didInit = true;
+    // Mark as read only once, after context is fully available
+    if (!_hasMarkedAsRead) {
       _markAsRead();
+      _hasMarkedAsRead = true;
     }
   }
 
   @override
   void dispose() {
-    ctrl.dispose();
-    _scrollCtrl.dispose();
+    _controller.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   void _markAsRead() {
-    final user = AppStateScope.of(context).currentUser;
-    if (user != null) {
-      ChatService().markMessagesAsRead(widget.conversationId, user.id);
+    final currentUser = AppStateScope.of(context).currentUser;
+    if (currentUser != null) {
+      ChatService().markMessagesAsRead(widget.chatRoomId, currentUser.id);
     }
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
+    if (_scrollController.hasClients) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
-      }
-    });
+      });
+    }
   }
 
-  Future<void> send() async {
-    final text = ctrl.text.trim();
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    final user = AppStateScope.of(context).currentUser;
-    final senderId = user?.id ?? 'guest';
-    final senderName = user?.name ?? 'Guest';
+    final currentUser = AppStateScope.of(context).currentUser;
+    if (currentUser == null) return;
 
-    ctrl.clear();
-    await ChatService().sendMessage(text, senderId, senderName, widget.conversationId);
+    _controller.clear();
+
+    await ChatService().sendMessage(
+      chatRoomId: widget.chatRoomId,
+      text: text,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+    );
+
+    _scrollToBottom();
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = AppStateScope.of(context).currentUser;
-    final myId = user?.id;
+    final currentUser = AppStateScope.of(context).currentUser;
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(child: Text('Πρέπει να συνδεθείτε')),
+      );
+    }
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.otherUserName)),
-      body: SafeArea(
-        child: Column(
+      appBar: AppBar(
+        elevation: 1,
+        title: Row(
           children: [
-            Expanded(
-              // Use StreamBuilder for real-time updates
-              child: StreamBuilder<List<ChatMessage>>(
-                stream: ChatService().getMessagesStream(widget.conversationId),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  
-                  final messages = snapshot.data ?? [];
-                  
-                  if (messages.isEmpty) {
-                    return const Center(
-                      child: Text('Δεν υπάρχουν μηνύματα', style: TextStyle(color: Colors.grey)),
-                    );
-                  }
-                  
-                  // Scroll to bottom when new messages arrive
-                  _scrollToBottom();
-                  
-                  return ListView.builder(
-                    controller: _scrollCtrl,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: messages.length,
-                    itemBuilder: (_, i) {
-                      final m = messages[i];
-                      final isMe = m.senderId == myId;
-                      final isSystem = m.senderId == 'system';
-                      final timeStr = DateFormat('HH:mm').format(m.timestamp);
-
-                      // System messages - centered and styled differently
-                      if (isSystem) {
-                        return Container(
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                m.text,
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      return Align(
-                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(12),
-                          constraints: const BoxConstraints(maxWidth: 280),
-                          decoration: BoxDecoration(
-                            color: isMe ? const Color(0xFF2563EB) : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Show sender name for received messages
-                              if (!isMe) ...[
-                                Text(
-                                  m.senderName,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF6B7280),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                              ],
-                              Text(m.text, style: TextStyle(color: isMe ? Colors.white : Colors.black87)),
-                              const SizedBox(height: 6),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    timeStr, 
-                                    style: TextStyle(
-                                      color: isMe ? Colors.white70 : const Color(0xFF6B7280), 
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  if (isMe) ...[
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      m.isRead ? Icons.done_all : Icons.done,
-                                      size: 14,
-                                      color: m.isRead ? Colors.lightBlueAccent : Colors.white70,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFFEFF4FF),
+              child: Text(
+                widget.otherUserName.isNotEmpty 
+                    ? widget.otherUserName[0].toUpperCase() 
+                    : '?',
+                style: const TextStyle(
+                  color: Color(0xFF2563EB),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            // Input area
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Colors.grey.shade200)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                widget.otherUserName,
+                style: const TextStyle(fontSize: 18),
+                overflow: TextOverflow.ellipsis,
               ),
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: ctrl,
-                      onSubmitted: (_) => send(),
-                      decoration: InputDecoration(
-                        hintText: 'Γράψε μήνυμα...',
-                        filled: true,
-                        fillColor: const Color(0xFFF3F4F6),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(26), 
-                          borderSide: BorderSide.none,
+            ),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          // Messages list with StreamBuilder for real-time updates
+          Expanded(
+            child: StreamBuilder<List<ChatMessage>>(
+              stream: ChatService().getMessagesStream(widget.chatRoomId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Σφάλμα: ${snapshot.error}'),
+                  );
+                }
+
+                final messages = snapshot.data ?? [];
+
+                if (messages.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 64,
+                          color: Colors.grey.shade300,
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Ξεκινήστε τη συζήτηση!',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                // Auto-scroll to bottom when new messages arrive
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _scrollToBottom();
+                });
+
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final message = messages[index];
+                    return _MessageBubble(
+                      message: message,
+                      isMe: message.senderId == currentUser.id,
+                      isSystem: message.senderId == 'system',
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+          // Message input area
+          Container(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 8,
+              top: 8,
+              bottom: MediaQuery.of(context).padding.bottom + 8,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: InputDecoration(
+                      hintText: 'Γράψτε μήνυμα...',
+                      hintStyle: TextStyle(color: Colors.grey.shade500),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF3F4F6),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
                       ),
                     ),
+                    onSubmitted: (_) => _sendMessage(),
                   ),
-                  const SizedBox(width: 10),
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: const Color(0xFF2563EB),
-                    child: IconButton(
-                      onPressed: send,
-                      icon: const Icon(Icons.send, color: Colors.white),
-                    ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2563EB),
+                    shape: BoxShape.circle,
                   ),
-                ],
+                  child: IconButton(
+                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                    onPressed: _sendMessage,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Message bubble widget - WhatsApp style
+class _MessageBubble extends StatelessWidget {
+  final ChatMessage message;
+  final bool isMe;
+  final bool isSystem;
+
+  const _MessageBubble({
+    required this.message,
+    required this.isMe,
+    required this.isSystem,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // System messages (centered, grey)
+    if (isSystem) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              message.text,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 13,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // User messages (blue right, grey left)
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.only(
+          top: 4,
+          bottom: 4,
+          left: isMe ? 60 : 0,
+          right: isMe ? 0 : 60,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isMe ? const Color(0xFF2563EB) : const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(isMe ? 18 : 4),
+            bottomRight: Radius.circular(isMe ? 4 : 18),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.text,
+              style: TextStyle(
+                color: isMe ? Colors.white : Colors.black87,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              DateFormat('HH:mm').format(message.timestamp),
+              style: TextStyle(
+                color: isMe ? Colors.white70 : Colors.grey.shade500,
+                fontSize: 11,
               ),
             ),
           ],

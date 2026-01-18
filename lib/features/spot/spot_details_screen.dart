@@ -162,17 +162,18 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
                   ],
                 ),
               ),
-              // Contact Host button
-              OutlinedButton.icon(
-                onPressed: () => _contactHost(context, s),
-                icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                label: const Text('Επικοινωνία'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF2563EB),
-                  side: const BorderSide(color: Color(0xFF2563EB)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              // Contact Host button - HIDDEN IF USER IS OWNER
+              if (s.ownerId != AppStateScope.of(context).currentUser?.id)
+                OutlinedButton.icon(
+                  onPressed: () => _contactHost(context, s),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: const Text('Επικοινωνία'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2563EB),
+                    side: const BorderSide(color: Color(0xFF2563EB)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
                 ),
-              ),
             ],
           ),
           const Divider(height: 32),
@@ -254,19 +255,19 @@ class _SpotDetailsScreenState extends State<SpotDetailsScreen> {
       return;
     }
 
-    // Get or create conversation for this spot
-    final conversationId = await ChatService().getOrCreateConversationForSpot(
-      driverId: currentUser.id,
-      driverName: currentUser.name,
-      hostId: spot.ownerId ?? 'unknown',
-      hostName: spot.ownerName,
+    // Get or create chat room for this spot using new chat_rooms structure
+    final chatRoom = await ChatService().getOrCreateChatRoom(
       spotId: spot.id,
       spotTitle: spot.title,
+      hostId: spot.ownerId ?? 'unknown',
+      hostName: spot.ownerName,
+      renterId: currentUser.id,
+      renterName: currentUser.name,
     );
 
     if (context.mounted) {
       context.push(Uri(path: '/chat', queryParameters: {
-        'id': conversationId,
+        'id': chatRoom.id,
         'name': spot.ownerName,
       }).toString());
     }

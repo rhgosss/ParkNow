@@ -128,7 +128,7 @@ GoRoute(
         builder: (context, state) {
           final id = state.uri.queryParameters['id'] ?? 'default';
           final name = state.uri.queryParameters['name'] ?? 'Chat';
-          return ChatScreen(conversationId: id, otherUserName: name);
+          return ChatScreen(chatRoomId: id, otherUserName: name);
         },
       ),
       GoRoute(path: '/favorites', builder: (_, __) => const FavoritesScreen()),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/data/parking_service.dart';
+import '../../../core/data/chat_service.dart';
 import '../../../core/state/app_state_scope.dart';
 
 class ActiveBookingScreen extends StatelessWidget {
@@ -94,11 +95,24 @@ class ActiveBookingScreen extends StatelessWidget {
               height: 54,
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {
+                onPressed: () async {
                   final user = AppStateScope.of(context).currentUser;
-                  if (user != null) {
-                    final chatId = '${user.id}_${activeBooking!.spot.ownerId}';
-                    context.push(Uri(path: '/chat', queryParameters: {'id': chatId, 'name': 'Host'}).toString());
+                  if (user != null && activeBooking != null) {
+                    // First ensure chat room exists, then navigate
+                    final chatRoom = await ChatService().getOrCreateChatRoom(
+                      spotId: activeBooking.spot.id,
+                      spotTitle: activeBooking.spot.title,
+                      hostId: activeBooking.spot.ownerId ?? 'unknown',
+                      hostName: activeBooking.spot.ownerName,
+                      renterId: user.id,
+                      renterName: user.name,
+                    );
+                    if (context.mounted) {
+                      context.push(Uri(path: '/chat', queryParameters: {
+                        'id': chatRoom.id, 
+                        'name': activeBooking.spot.ownerName,
+                      }).toString());
+                    }
                   }
                 },
                 icon: const Icon(Icons.chat_bubble_outline),

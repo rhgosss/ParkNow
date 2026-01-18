@@ -46,7 +46,46 @@ class ParkingService {
 
 
   Future<void> init() async {
-    // Listen to real-time bookings
+    // STEP 1: First, fetch spots synchronously so they're available for bookings
+    try {
+      final spotsSnapshot = await _db.collection('spots').get();
+      _firestoreSpots = spotsSnapshot.docs
+          .map((doc) => GarageSpot.fromFirestore(doc.id, doc.data()))
+          .toList();
+      _emitSpots();
+    } catch (e) {
+      print('Error loading spots: $e');
+    }
+
+    // STEP 2: Now fetch bookings (spots are already loaded)
+    try {
+      final bookingsSnapshot = await _db.collection('bookings').get();
+      _bookings.clear();
+      for (var doc in bookingsSnapshot.docs) {
+        try {
+          final data = doc.data();
+          final spotId = data['spotId'];
+          var spot = getSpot(spotId);
+          if (spot != null) {
+            _bookings.add(Booking.fromFirestore(doc.id, data, spot));
+          }
+        } catch (e) {
+          print('Error parsing booking ${doc.id}: $e');
+        }
+      }
+      print('ParkingService: Loaded ${_bookings.length} bookings');
+    } catch (e) {
+      print('Error loading bookings: $e');
+    }
+
+    // STEP 3: Set up real-time listeners for future updates
+    _db.collection('spots').snapshots().listen((snapshot) {
+      _firestoreSpots = snapshot.docs
+          .map((doc) => GarageSpot.fromFirestore(doc.id, doc.data()))
+          .toList();
+      _emitSpots();
+    });
+
     _db.collection('bookings').snapshots().listen((snapshot) {
       _bookings.clear();
       for (var doc in snapshot.docs) {
@@ -61,18 +100,7 @@ class ParkingService {
           print('Error parsing booking ${doc.id}: $e');
         }
       }
-      print('ParkingService: Loaded ${_bookings.length} bookings');
     });
-
-    // Listen to real-time spots
-    _db.collection('spots').snapshots().listen((snapshot) {
-      // FIX: Replace the list entirely, do not append.
-      _firestoreSpots = snapshot.docs.map((doc) => GarageSpot.fromFirestore(doc.id, doc.data())).toList();
-      _emitSpots();
-    });
-    
-    // Emit initial
-    _emitSpots();
   }
   
   void _emitSpots() {

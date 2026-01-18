@@ -1,22 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'storage_service.dart';
 
+/// Message model for individual chat messages
 class ChatMessage {
   final String id;
   final String text;
   final String senderId;
   final String senderName;
-  final String conversationId;
   final DateTime timestamp;
   final bool isRead;
 
   ChatMessage({
-    required this.id, 
-    required this.text, 
-    required this.senderId, 
+    required this.id,
+    required this.text,
+    required this.senderId,
     required this.senderName,
-    required this.conversationId,
     required this.timestamp,
     this.isRead = false,
   });
@@ -26,7 +24,6 @@ class ChatMessage {
       'text': text,
       'senderId': senderId,
       'senderName': senderName,
-      'conversationId': conversationId,
       'timestamp': Timestamp.fromDate(timestamp),
       'isRead': isRead,
     };
@@ -38,109 +35,305 @@ class ChatMessage {
       text: data['text'] ?? '',
       senderId: data['senderId'] ?? '',
       senderName: data['senderName'] ?? 'User',
-      conversationId: data['conversationId'] ?? 'default',
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRead: data['isRead'] ?? false,
     );
   }
 }
 
+/// Chat room model representing a conversation between host and renter
+class ChatRoom {
+  final String id;
+  final String spotId;
+  final String spotTitle;
+  final String hostId;
+  final String hostName;
+  final String renterId;
+  final String renterName;
+  final String? lastMessage;
+  final DateTime? lastTimestamp;
+  final DateTime createdAt;
 
+  ChatRoom({
+    required this.id,
+    required this.spotId,
+    required this.spotTitle,
+    required this.hostId,
+    required this.hostName,
+    required this.renterId,
+    required this.renterName,
+    this.lastMessage,
+    this.lastTimestamp,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'spotId': spotId,
+      'spotTitle': spotTitle,
+      'hostId': hostId,
+      'hostName': hostName,
+      'renterId': renterId,
+      'renterName': renterName,
+      'lastMessage': lastMessage,
+      'lastTimestamp': lastTimestamp != null ? Timestamp.fromDate(lastTimestamp!) : null,
+      'createdAt': Timestamp.fromDate(createdAt),
+    };
+  }
+
+  factory ChatRoom.fromFirestore(String id, Map<String, dynamic> data) {
+    return ChatRoom(
+      id: id,
+      spotId: data['spotId'] ?? '',
+      spotTitle: data['spotTitle'] ?? '',
+      hostId: data['hostId'] ?? '',
+      hostName: data['hostName'] ?? '',
+      renterId: data['renterId'] ?? '',
+      renterName: data['renterName'] ?? '',
+      lastMessage: data['lastMessage'],
+      lastTimestamp: (data['lastTimestamp'] as Timestamp?)?.toDate(),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+}
+
+/// Chat Service - manages all chat room and messaging operations
 class ChatService extends ChangeNotifier {
   static final ChatService _instance = ChatService._internal();
   factory ChatService() => _instance;
   ChatService._internal();
 
-  List<ChatMessage> _messages = [];
-  bool _initialized = false;
-
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  /// Generate a canonical conversation ID that is the same regardless of who initiates
-  /// For simple 1:1 chats without spot context
-  static String getCanonicalChatId(String uid1, String uid2) {
-    // Sort alphabetically to ensure consistent ID regardless of who starts
-    if (uid1.compareTo(uid2) < 0) {
-      return '${uid1}_$uid2';
-    } else {
-      return '${uid2}_$uid1';
-    }
-  }
-
-  /// Generate a canonical conversation ID for spot-related conversations
-  static String getCanonicalSpotChatId(String uid1, String uid2, String spotId, [String? suffix]) {
-    // Sort user IDs alphabetically for consistency
-    final sortedUserPart = uid1.compareTo(uid2) < 0 
-        ? '${uid1}_$uid2' 
-        : '${uid2}_$uid1';
-    if (suffix != null) {
-      return '${sortedUserPart}_${spotId}_$suffix';
-    }
-    return '${sortedUserPart}_$spotId';
-  }
-
-  Future<void> init() async {
-    if (_initialized) return;
-    
-    // Listen to ALL messages with real-time updates
-    _db.collection('messages').orderBy('timestamp').snapshots().listen((snapshot) {
-      _messages = snapshot.docs.map((doc) {
-        return ChatMessage.fromFirestore(doc.id, doc.data());
-      }).toList();
-      notifyListeners();
-    });
-    
-    _initialized = true;
-  }
-
-  List<ChatMessage> getMessages(String conversationId) {
-    return _messages.where((m) => m.conversationId == conversationId).toList();
-  }
   
-  /// Stream messages for a specific conversation (for StreamBuilder usage)
-  Stream<List<ChatMessage>> getMessagesStream(String conversationId) {
-    return _db
+  /// Collection reference for chat rooms
+  CollectionReference<Map<String, dynamic>> get _chatRoomsRef => 
+      _db.collection('chat_rooms');
+
+  /// Generate composite chat room ID: spotId_hostId_renterId
+  /// This ensures a unique chat for every specific rental
+  static String getChatRoomId({
+    required String spotId,
+    required String hostId,
+    required String renterId,
+  }) {
+    return '${spotId}_${hostId}_$renterId';
+  }
+
+  /// Get or create a chat room for a specific spot/host/renter combination
+  Future<ChatRoom> getOrCreateChatRoom({
+    required String spotId,
+    required String spotTitle,
+    required String hostId,
+    required String hostName,
+    required String renterId,
+    required String renterName,
+  }) async {
+    final chatRoomId = getChatRoomId(
+      spotId: spotId,
+      hostId: hostId,
+      renterId: renterId,
+    );
+
+    final docRef = _chatRoomsRef.doc(chatRoomId);
+    final docSnapshot = await docRef.get();
+
+    if (docSnapshot.exists) {
+      return ChatRoom.fromFirestore(chatRoomId, docSnapshot.data()!);
+    }
+
+    // Create new chat room
+    final now = DateTime.now();
+    final chatRoom = ChatRoom(
+      id: chatRoomId,
+      spotId: spotId,
+      spotTitle: spotTitle,
+      hostId: hostId,
+      hostName: hostName,
+      renterId: renterId,
+      renterName: renterName,
+      createdAt: now,
+    );
+
+    await docRef.set(chatRoom.toFirestore());
+
+    // Send initial system message
+    await _sendSystemMessage(
+      chatRoomId: chatRoomId,
+      text: '💬 Νέα συνομιλία για "$spotTitle". Καλή επικοινωνία!',
+    );
+
+    return chatRoom;
+  }
+
+  /// Send a system message (for initial chat creation, etc.)
+  Future<void> _sendSystemMessage({
+    required String chatRoomId,
+    required String text,
+  }) async {
+    final message = ChatMessage(
+      id: '',
+      text: text,
+      senderId: 'system',
+      senderName: 'ParkNow',
+      timestamp: DateTime.now(),
+    );
+
+    await _chatRoomsRef
+        .doc(chatRoomId)
         .collection('messages')
-        .where('conversationId', isEqualTo: conversationId)
-        .orderBy('timestamp')
+        .add(message.toFirestore());
+  }
+
+  /// Send a message in a chat room
+  Future<void> sendMessage({
+    required String chatRoomId,
+    required String text,
+    required String senderId,
+    required String senderName,
+  }) async {
+    final message = ChatMessage(
+      id: '',
+      text: text,
+      senderId: senderId,
+      senderName: senderName,
+      timestamp: DateTime.now(),
+    );
+
+    // Add message to subcollection
+    await _chatRoomsRef
+        .doc(chatRoomId)
+        .collection('messages')
+        .add(message.toFirestore());
+
+    // Update parent document with last message info
+    await _chatRoomsRef.doc(chatRoomId).update({
+      'lastMessage': text,
+      'lastTimestamp': Timestamp.now(),
+    });
+
+    notifyListeners();
+  }
+
+  /// Stream messages for a specific chat room (for real-time updates)
+  Stream<List<ChatMessage>> getMessagesStream(String chatRoomId) {
+    return _chatRoomsRef
+        .doc(chatRoomId)
+        .collection('messages')
+        .orderBy('timestamp', descending: false)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => ChatMessage.fromFirestore(doc.id, doc.data()))
             .toList());
   }
 
-  // Get all conversation IDs for a user
-  List<String> getConversationsForUser(String userId) {
-    return _messages.map((m) => m.conversationId).toSet().where((id) => id.contains(userId)).toList();
+  /// Get all chat rooms where user is the HOST (for host mode)
+  Future<List<ChatRoom>> getChatRoomsForHost(String userId) async {
+    try {
+      final querySnapshot = await _chatRoomsRef
+          .where('hostId', isEqualTo: userId)
+          .orderBy('lastTimestamp', descending: true)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => ChatRoom.fromFirestore(doc.id, doc.data()))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching host chat rooms: $e');
+      // Fallback without ordering if index doesn't exist
+      try {
+        final querySnapshot = await _chatRoomsRef
+            .where('hostId', isEqualTo: userId)
+            .get();
+
+        final rooms = querySnapshot.docs
+            .map((doc) => ChatRoom.fromFirestore(doc.id, doc.data()))
+            .toList();
+        
+        // Sort locally
+        rooms.sort((a, b) => (b.lastTimestamp ?? b.createdAt)
+            .compareTo(a.lastTimestamp ?? a.createdAt));
+        
+        return rooms;
+      } catch (e2) {
+        debugPrint('Fallback also failed: $e2');
+        return [];
+      }
+    }
   }
 
-  Future<void> sendMessage(String text, String senderId, String senderName, String conversationId) async {
-    final msg = ChatMessage(
-      id: '', // Generated by Firestore
-      text: text,
-      senderId: senderId,
-      senderName: senderName,
-      conversationId: conversationId,
-      timestamp: DateTime.now(),
-    );
-    
-    await _db.collection('messages').add(msg.toFirestore());
-    
-    // Update lastMessageAt so conversation appears at top of list for both parties
-    await _db.collection('conversations').doc(conversationId).update({
-      'lastMessageAt': Timestamp.now(),
-    }).catchError((_) {
-      // Ignore if conversation doc doesn't exist yet
-    });
+  /// Get all chat rooms where user is the RENTER (for driver mode)
+  Future<List<ChatRoom>> getChatRoomsForRenter(String userId) async {
+    try {
+      final querySnapshot = await _chatRoomsRef
+          .where('renterId', isEqualTo: userId)
+          .orderBy('lastTimestamp', descending: true)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => ChatRoom.fromFirestore(doc.id, doc.data()))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching renter chat rooms: $e');
+      // Fallback without ordering if index doesn't exist
+      try {
+        final querySnapshot = await _chatRoomsRef
+            .where('renterId', isEqualTo: userId)
+            .get();
+
+        final rooms = querySnapshot.docs
+            .map((doc) => ChatRoom.fromFirestore(doc.id, doc.data()))
+            .toList();
+        
+        // Sort locally
+        rooms.sort((a, b) => (b.lastTimestamp ?? b.createdAt)
+            .compareTo(a.lastTimestamp ?? a.createdAt));
+        
+        return rooms;
+      } catch (e2) {
+        debugPrint('Fallback also failed: $e2');
+        return [];
+      }
+    }
+  }
+
+  /// Stream chat rooms for host (real-time updates)
+  Stream<List<ChatRoom>> getChatRoomsStreamForHost(String userId) {
+    return _chatRoomsRef
+        .where('hostId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          final rooms = snapshot.docs
+              .map((doc) => ChatRoom.fromFirestore(doc.id, doc.data()))
+              .toList();
+          rooms.sort((a, b) => (b.lastTimestamp ?? b.createdAt)
+              .compareTo(a.lastTimestamp ?? a.createdAt));
+          return rooms;
+        });
+  }
+
+  /// Stream chat rooms for renter (real-time updates)
+  Stream<List<ChatRoom>> getChatRoomsStreamForRenter(String userId) {
+    return _chatRoomsRef
+        .where('renterId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          final rooms = snapshot.docs
+              .map((doc) => ChatRoom.fromFirestore(doc.id, doc.data()))
+              .toList();
+          rooms.sort((a, b) => (b.lastTimestamp ?? b.createdAt)
+              .compareTo(a.lastTimestamp ?? a.createdAt));
+          return rooms;
+        });
   }
 
   /// Mark messages as read
-  Future<void> markMessagesAsRead(String conversationId, String readerId) async {
-    final unreadMessages = await _db.collection('messages')
-        .where('conversationId', isEqualTo: conversationId)
+  Future<void> markMessagesAsRead(String chatRoomId, String readerId) async {
+    final unreadMessages = await _chatRoomsRef
+        .doc(chatRoomId)
+        .collection('messages')
         .where('isRead', isEqualTo: false)
         .get();
-    
+
     for (var doc in unreadMessages.docs) {
       // Only mark as read if the reader is NOT the sender
       if (doc.data()['senderId'] != readerId) {
@@ -149,242 +342,11 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  // Create a conversation when booking is made
-  Future<String> createConversationForBooking({
-    required String driverId,
-    required String driverName,
-    required String hostId,
-    required String hostName,
-    required String spotId,
-    required String spotTitle,
-    required String bookingId,
-  }) async {
-    // Use canonical ID generation for consistency
-    final conversationId = getCanonicalSpotChatId(driverId, hostId, spotId, bookingId);
-    
-    // Check if exists first
-    final existingDoc = await _db.collection('conversations').doc(conversationId).get();
-    if (existingDoc.exists) {
-      return conversationId;
-    }
-    
-    // Send initial system message
-    final initialMsg = ChatMessage(
-      id: '',
-      text: '🅿️ Νέα κράτηση για "$spotTitle"! Μπορείτε να επικοινωνήσετε εδώ.',
-      senderId: 'system',
-      senderName: 'ParkNow',
-      conversationId: conversationId,
-      timestamp: DateTime.now(),
-    );
-    
-    await _db.collection('messages').add(initialMsg.toFirestore());
-    
-    // Store conversation metadata with PARTICIPANTS ARRAY for unified queries
-    await _db.collection('conversations').doc(conversationId).set({
-      'participants': [driverId, hostId], // KEY FIX: Array for arrayContains queries
-      'driverId': driverId,
-      'driverName': driverName,
-      'hostId': hostId,
-      'hostName': hostName,
-      'spotId': spotId,
-      'spotTitle': spotTitle,
-      'bookingId': bookingId,
-      'createdAt': Timestamp.now(),
-      'lastMessageAt': Timestamp.now(),
-    });
-    
-    return conversationId;
-  }
-
-  /// Get or create a conversation for contacting host about a spot (pre-booking inquiry)
-  Future<String> getOrCreateConversationForSpot({
-    required String driverId,
-    required String driverName,
-    required String hostId,
-    required String hostName,
-    required String spotId,
-    required String spotTitle,
-  }) async {
-    // Use canonical ID for consistency - same ID regardless of who initiates
-    final conversationId = getCanonicalSpotChatId(driverId, hostId, spotId, 'inquiry');
-    
-    // Check if conversation already exists
-    final existingDoc = await _db.collection('conversations').doc(conversationId).get();
-    if (existingDoc.exists) {
-      return conversationId; // Return existing conversation
-    }
-    
-    // Create new inquiry conversation
-    final initialMsg = ChatMessage(
-      id: '',
-      text: '💬 Νέα συνομιλία για "$spotTitle". Ρωτήστε ό,τι θέλετε!',
-      senderId: 'system',
-      senderName: 'ParkNow',
-      conversationId: conversationId,
-      timestamp: DateTime.now(),
-    );
-    
-    await _db.collection('messages').add(initialMsg.toFirestore());
-    
-    await _db.collection('conversations').doc(conversationId).set({
-      'participants': [driverId, hostId], // KEY FIX: Array for arrayContains queries
-      'driverId': driverId,
-      'driverName': driverName,
-      'hostId': hostId,
-      'hostName': hostName,
-      'spotId': spotId,
-      'spotTitle': spotTitle,
-      'bookingId': 'inquiry',
-      'createdAt': Timestamp.now(),
-      'lastMessageAt': Timestamp.now(),
-    });
-    
-    return conversationId;
-  }
-
-  /// Get ALL conversations where user is a participant (for unified inbox)
-  Future<List<Map<String, dynamic>>> getConversationsForUserAsync(String userId) async {
-    try {
-      // Use participants array for single query (requires Firestore index)
-      final result = await _db.collection('conversations')
-          .where('participants', arrayContains: userId)
-          .get();
-      
-      final results = result.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
-      
-      // Sort by last message time
-      results.sort((a, b) {
-        final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        return bTime.compareTo(aTime);
-      });
-      
-      return results;
-    } catch (e) {
-      debugPrint('Error with participants query, falling back: $e');
-      // Fallback: Query both as driver and host
-      final asDriver = await _db.collection('conversations')
-          .where('driverId', isEqualTo: userId)
-          .get();
-      
-      final asHost = await _db.collection('conversations')
-          .where('hostId', isEqualTo: userId)
-          .get();
-      
-      final all = [...asDriver.docs, ...asHost.docs];
-      final results = all.map((doc) => {'id': doc.id, ...doc.data()}).toList();
-      
-      // Deduplicate and sort
-      final seen = <String>{};
-      results.removeWhere((r) => !seen.add(r['id'] as String));
-      results.sort((a, b) {
-        final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        return bTime.compareTo(aTime);
-      });
-      
-      return results;
-    }
-  }
-
-  // Get conversations where user is HOST only (for host mode messages view)
-  Future<List<Map<String, dynamic>>> getConversationsForHost(String userId) async {
-    try {
-      final asHost = await _db.collection('conversations')
-          .where('hostId', isEqualTo: userId)
-          .get();
-      
-      final results = asHost.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
-      
-      results.sort((a, b) {
-        final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        return bTime.compareTo(aTime);
-      });
-      
-      return results;
-    } catch (e) {
-      debugPrint('Error fetching host conversations: $e');
-      return [];
-    }
-  }
-
-  // Get conversations where user is DRIVER only (for user mode messages view)
-  Future<List<Map<String, dynamic>>> getConversationsForDriver(String userId) async {
-    try {
-      final asDriver = await _db.collection('conversations')
-          .where('driverId', isEqualTo: userId)
-          .get();
-      
-      final results = asDriver.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
-      
-      results.sort((a, b) {
-        final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime(1970);
-        return bTime.compareTo(aTime);
-      });
-      
-      return results;
-    } catch (e) {
-      debugPrint('Error fetching driver conversations: $e');
-      return [];
-    }
-  }
-
-  // Check if this is the first user message in a conversation
-  Future<bool> isFirstUserMessage(String conversationId, String driverId) async {
-    final messages = await _db.collection('messages')
-        .where('conversationId', isEqualTo: conversationId)
-        .where('senderId', isEqualTo: driverId)
-        .limit(1)
-        .get();
-    
-    return messages.docs.isEmpty;
-  }
-
-  // Send automated reply from host
-  Future<void> sendAutoReply(String conversationId, String hostId, String hostName) async {
-    final autoReply = ChatMessage(
-      id: '',
-      text: 'Ευχαριστώ για το ενδιαφέρον σας! Θα απαντήσω σύντομα. 🅿️',
-      senderId: hostId,
-      senderName: hostName,
-      conversationId: conversationId,
-      timestamp: DateTime.now(),
-    );
-    
-    await _db.collection('messages').add(autoReply.toFirestore());
-    
-    await _db.collection('conversations').doc(conversationId).update({
-      'lastMessageAt': Timestamp.now(),
-      'hasAutoReplied': true,
-    });
-  }
-
-  // Check if auto-reply was already sent
-  Future<bool> hasAutoReplied(String conversationId) async {
-    final doc = await _db.collection('conversations').doc(conversationId).get();
-    return doc.data()?['hasAutoReplied'] == true;
-  }
-
-  // Send message with auto-reply trigger
-  Future<void> sendMessageWithAutoReply({
-    required String text,
-    required String senderId,
-    required String senderName,
-    required String conversationId,
-    String? hostId,
-    String? hostName,
-  }) async {
-    await sendMessage(text, senderId, senderName, conversationId);
-    
-    if (hostId != null && hostName != null && senderId != hostId) {
-      final alreadyReplied = await hasAutoReplied(conversationId);
-      if (!alreadyReplied) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        await sendAutoReply(conversationId, hostId, hostName);
-      }
-    }
+  /// Check if user can message this spot (prevents self-messaging)
+  bool canMessageSpot({
+    required String currentUserId,
+    required String spotOwnerId,
+  }) {
+    return currentUserId != spotOwnerId;
   }
 }
